@@ -18,7 +18,7 @@ public:
         delete[] name_;
     }
 
-    char* getname() const {
+    char* getName() const {
         return name_;
     }
     void eat() const {
@@ -43,7 +43,7 @@ public:
 
 int main() {
     Dog *dog = new Dog("Pappu", 3);
-    std::cout << "Dog's name is: " << dog->getname() << "\n";
+    std::cout << "Dog's name is: " << dog->getName() << "\n";
     dog->bark();
     delete dog;
     return 0;
