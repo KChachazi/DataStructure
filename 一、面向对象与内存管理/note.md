@@ -125,6 +125,51 @@ public:
 
 ### 继承
 
+继承是指，依据另一个类来定义一个类。通过继承我们可以更简单高效的复用代码。
+
+如下是一个典型的继承例子：
+
+```cpp
+class Animal {
+private:
+    char *name_;
+    int age_;
+public:
+    Animal(const char *name, int age) : age_(age) {
+        name_ = new char[strlen(name) + 1];
+        std::strcpy(name_, name);
+        std::cout << "Animal " << name_ << " created.\n";
+    }
+
+    ~Animal() {
+        std::cout << "Animal " << name_ << " destroyed.\n";
+        delete[] name_;
+    }
+
+    char* getname() const {
+        return name_;
+    }
+    void eat() const {
+        std::cout << name_ << " is eating.\n";
+    }
+    void sleep() const {
+        std::cout << name_ << " is sleeping.\n";
+    }
+};
+
+class Dog : public Animal {
+public:
+
+    Dog(const char *name, int age) : Animal(name, age) {
+        std::cout << "Dog " << name << " created.\n";
+    }
+    
+    void bark() const {
+        std::cout << "Woof! Woof!\n";
+    }
+};
+```
+
 
 
 ### 多态
