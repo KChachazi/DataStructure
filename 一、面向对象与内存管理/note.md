@@ -1,3 +1,7 @@
+# Updates
+
+- 2025/10/16: 完成面向对象部分，并结束一审。
+
 # 面向对象与内存管理
 
 ## 面向对象概述
@@ -28,12 +32,9 @@
 - ```public```：公有成员，可以在任何地方方位。
 - ```protected```：保护成员，可以在继承中使用。
 
-如下是一个简单的类实现（```sample_1_Adventurer.cpp```）：
+如下是一个简单的类实现：
 
 ```cpp
-#include <iostream>
-#include <cstdio>
-
 class Adventurer {
 private:
     char *name_;
@@ -85,7 +86,7 @@ public:
         std::cout << name_ << "'s health changed to " << *health_ << ".\n";
         if (*health_ == 0) {
             std::cout << name_ << " has been killed!\n";
-            delete this; // 自我销毁
+            delete this;
         }
     }
 
@@ -121,7 +122,7 @@ public:
 - ```get/change```函数(const成员函数)
     用于从外部获取或修改某函数值。
 
-上面的例子有几处危险的写法，这个我们后面再聊。
+需要注意的是，上面的例子有一处危险的写法```delete this;```，具体原因和风险我们后面再聊。
 
 ### 继承
 
