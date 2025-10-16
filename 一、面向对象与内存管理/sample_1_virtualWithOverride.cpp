@@ -33,7 +33,7 @@ public:
         std::cout << "Dog destroyed.\n";
     }
 
-    void makeSound() const override {
+    void makeSound() {
         std::cout << "Woof! Woof!\n";
     }
 };

@@ -127,6 +127,8 @@ public:
 
 继承是指，依据另一个类来定义一个类。通过继承我们可以更简单高效的复用代码。
 
+#### 单继承
+
 如下是一个典型的继承例子：
 
 ```cpp
@@ -187,6 +189,10 @@ public:
 
 - $\text{protected}$(可以在派生类中访问，但类外不可访问，本例中不存在)
 
+#### 多继承
+
+To be continued...
+
 ### 多态
 
 多态的核心在于，让同一接口对于不同对象表现出不同的行为。
@@ -200,7 +206,7 @@ public:
 
 在OOP中，我们主要讨论动态多态的实现方式。
 
-#### 虚函数与虚函数表
+#### 虚函数
 
 虚函数的关键字为**virtual**，声明一个虚函数的方式如下：
 
@@ -248,26 +254,149 @@ public:
 
 #### **override**关键字
 
-**override**关键字是一个用于**降低风险**的关键字，只要包含override关键字，则表明该函数是基类中已有声明的虚函数的重写，可以规避静态重载的可能。例如如下的代码：
+**override**关键字是一个用于**降低风险**的关键字，只要包含**override**关键字，则表明该函数是基类中已有声明的虚函数的重写，可以规避静态重载的可能。例如如下的代码：
 
 ```cpp
-class Mom {
-protected:
-    string name_;
+class Animal {
+    std::string name_;
+    int age_;
 public:
-    ~Mom() { }
-    const string getName() const {
-        return name_;
+    Animal(const char *name, int age) : name_(name), age_(age) {
+        std::cout << "Animal " << name_ << " created.\n";
     }
-}
 
-class Child : public Mom {
-    string getName() {
-        return name_;
+    virtual ~Animal() {
+        std::cout << "Animal " << name_ << " destroyed.\n";
     }
-}
+
+    virtual void makeSound() const {
+        std::cout << "Animal sound!\n";
+    }
+};
+
+class Dog : public Animal {
+public:
+    Dog(const char *name, int age) : Animal(name, age) {
+        std::cout << "Dog " << name << " created.\n";
+    }
+
+    ~Dog() override {
+        std::cout << "Dog destroyed.\n";
+    }
+
+    void makeSound() {
+        std::cout << "Woof! Woof!\n";
+    }
+};
 
 ```
+在上面的实例中如果我们用如下的方式操作。
+
+```cpp
+Animal *d = new Dog("Buddy", 3);
+d->makeSound();
+delete d;
+```
+
+则输出如下
+
+```
+Animal Buddy created.
+Dog Buddy created.
+Animal sound!
+Dog destroyed.
+Animal Buddy destroyed.
+```
+
+可以看到输出中出现了```Animal sound!```，说明我们在```d->makeSound();```这一行中调用的函数并不是在```class Dog```中**尝试重写**的那个。详细分析代码可以发现，由于两个函数声明上的区别（```void Animal::makeSound const()```与```void Dog::makeSound()```），编译器将两个函数分别认为两个独立函数去思考，而并没有认为是基类中虚函数的重写。
+
+因此就可以看出**override**在这个过程中的作用：明确告知编译器，此函数是基类虚函数的重写。在编译时，编译器会主动寻找基类中的虚函数，并搭建虚函数表，如果类型有出入则提示编译错误。从而，可以规避不影响代码跑通的隐形错误。
+
+#### 虚函数表
+
+当类中含有虚函数时，编译器会生成虚函数表(vtable)和虚表指针(vptr)。
+
+##### 虚表指针的存在
+
+```cpp
+class A {
+public:
+    void function() {
+        std::cout << "This is A::function()" << '\n';
+    }
+};
+
+class B {
+public:
+    virtual void function() {
+        std::cout << "This is B::function()" << '\n';
+    }
+};
+```
+
+```cpp
+A a;
+B b;
+std::cout << "Size of class A: " << sizeof(a) << '\n';
+std::cout << "Size of class B: " << sizeof(b) << '\n';
+```
+
+针对如上的类，我们运行下方的代码，得到类A与B的大小分别为**1**和**8**。C++标准要求所有对象都需要有独特的地址，因此对空类A分配了大小为**1**的空间；而对于类B，由于其中含有虚函数，所以在生成该类时同时生成了虚表指针，该指针占据空间为**8**，因而我们得知虚表指针是存在的。
+
+##### 虚表指针的生成
+
+虚表指针既然存在，还占据空间，那么一定会生成，也就是初始化。经查阅资料可以得知，含有虚函数的类在生成时会经历如下的过程：
+
+- 对象内存分配
+    为该类的所有对象（所有数据成员和虚表指针）分配内存。
+
+- 虚表指针初始化
+    进入构造函数代码的执行阶段之前，编译器生成的代码会先将虚表指针指向该类的虚表（一个类具有一个固定虚函数表）。
+
+- 构造函数的执行
+    构造函数如有初始化列表，则先执行初始化列表以初始化类的数据成员，随后执行构造函数内的代码。
+
+根据上面的流程可以知道，虚表指针在构造函数中被初始化，进而，一个类的构造函数是不能成为虚函数的。
+
+##### 虚函数表
+
+类与虚函数表式、是一一对应关系，一个类具有一个固定虚函数表。
+
+在单继承中，派生类仅会初始化一个虚表指针，指向其基类的虚函数表；在多继承中，派生类会根据基类的数量生成对应数量的虚表指针。
+
+来看下面的例子：
+
+```cpp
+class A {
+public:
+    virtual void functionA() {
+        std::cout << "This is A::functionA()" << '\n';
+    }
+};
+
+class B {
+public:
+    virtual void functionB() {
+        std::cout << "This is B::functionB()" << '\n';
+    }
+};
+
+class C : public A, public B {
+public:
+    void functionA() override {
+        std::cout << "This is C::functionA()" << '\n';
+    }
+    void functionB() override {
+        std::cout << "This is C::functionB()" << '\n';
+    }
+};
+```
+
+在这个实例中，执行
+```cpp
+std::cout << "Size of class C: " << sizeof(c) << '\n';
+```
+得到```Size of class C: 16```。这说明在继承了基类A和基类B的派生类C中含有两个虚表指针，分别指向基类A与基类B的虚函数表。
 
 #### 总结表格
 
