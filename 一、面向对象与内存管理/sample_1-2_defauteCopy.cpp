@@ -23,8 +23,5 @@ int main() {
     std::cout << a2->name << '\n';
 
     delete a2;
-    
-    // std::cout << a2->val << ", " << a2->name << std::endl;
-
     return 0;
 }
