@@ -20,11 +20,64 @@
 
 #### 浅拷贝的实现
 
-来看下面的有关浅拷贝的实例：
+来看如下的一个简单类A：
+
+```cpp
+class A {
+public:
+    int val;
+    char* name;
+    A(int v, const char* n) : val(v) {
+        name = new char[strlen(n) + 1];
+        strcpy(name, n);
+    }
+    ~A() {
+        delete[] name;
+    }
+};
+```
+
+我们执行下面的代码段：
+```cpp
+A a1(10, "Object A1");
+A a2 = a1;
+std::cout << "a1.val: " << a1.val << ", a1.name: " << a1.name << std::endl;
+std::cout << "a2.val: " << a2.val << ", a2.name: " << a2.name << std::endl;
+
+strcpy(a2.name, "Modified A2");
+std::cout << "After modifying a2.name:" << std::endl;
+std::cout << "a1.val: " << a1.val << ", a1.name: " << a1.name << std::endl;
+std::cout << "a2.val: " << a2.val << ", a2.name: " << a2.name << std::endl;
+```
+
+得到的输出如下：
+```
+a1.val: 10, a1.name: Object A1
+a2.val: 10, a2.name: Object A1
+After modifying a2.name:
+a1.val: 10, a1.name: Modified A2
+a2.val: 10, a2.name: Modified A2
+```
+
+可以发现，当我们对```a2.name```进行修改后，```a1.name```也随之改变。这是由于C++的默认拷贝方式为浅拷贝，即对于基本数据类型使用赋值的方式直接拷贝，因此对于基本数据类型的指针，拷贝得到的是相同的地址。因而两个指针指向了相同的内存地址。
 
 #### 浅拷贝的风险
 
-从上面对于该实例的分析中可以得到，浅拷贝只能对浅层数据进行拷贝。对于一些非指针的基本类型，浅拷贝不具有安全问题；但是对于指针和各种类（尤其包含原始指针、文件句柄等资源的类），浅拷贝会导致多个变量共享同一块内存的隐性问题。这种隐性问题同样是编译时不会出现，但是运行时导致错误的，比如：
+对于上面的类A，首先发现的风险在前面已经出现了，就是两个类的数据会出现共享的情况，在庞大的代码中可能出现不可控的风险。
+
+更严重的事，我们如果执行下面的代码：
+
+```cpp
+A *a1 = new A(10, "Original A1");
+A *a2 = new A(*a1);
+delete a1;
+std::cout << a2->val << ", " << a2->name << '\n';
+delete a2;
+```
+
+当我们主动释放```a1```对应的空间后，```a2```中的```name```变量也随之被主动释放，接着变成了野指针。随后我们主动释放```a2```时，还有多重释放的问题。
+
+从上面对于该实例的分析中可以得到，浅拷贝只能对浅层数据进行拷贝。对于一些非指针的基本类型，浅拷贝不具有安全问题；但是对于指针和各种类（尤其包含原始指针、文件句柄等资源的类），浅拷贝会导致多个变量共享同一块内存的隐性问题。这种隐性问题同样是编译时不会出现，但是运行时导致错误的，包括但不限于：
 
 - 双重释放
 - 内存泄漏
