@@ -102,13 +102,13 @@ public:
     int val;
     char *name;
     A(int v, const char *n) : val(v) {
-        name = new char(strlen(n) + 1);
+        name = new char[strlen(n) + 1];
         strcpy(name, n);
     }
 
     // 深拷贝构造函数
     A(const A &other) : val(other.val) {
-        name = new char(strlen(other.name) + 1);
+        name = new char[strlen(other.name) + 1];
         strcpy(name, other.name);
     }
 
@@ -118,7 +118,7 @@ public:
 
         delete[] name; // 释放已有资源
         val = other.val;
-        name = new char(strlen(other.name) + 1);
+        name = new char[strlen(other.name) + 1];
         strcpy(name, other.name);
         return *this; // 返回自身以支持链式赋值 a = b = c;
     }
@@ -339,20 +339,20 @@ private:
     int level;
 public:
     Adventurer(const char *n, int l) : level(l) {
-        name = new char(strlen(n) + 1);
+        name = new char[strlen(n) + 1];
         strcpy(name, n);
     }
     ~Adventurer() {
         delete[] name;
     }
     Adventurer(const Adventurer &other) : level(other.level) {
-        name = new char(strlen(other.name) + 1);
+        name = new char[strlen(other.name) + 1];
         strcpy(name, other.name);
     }
     Adventurer& operator = (const Adventurer &other) {
         if (this == &other) return *this;
         delete[] name;
-        name = new char(strlen(other.name) + 1);
+        name = new char[strlen(other.name) + 1];
         level = other.level;
         strcpy(name, other.name);
         return *this;
@@ -472,6 +472,8 @@ Name: Charlie, Level: 15
 
 实际上上面的实例是一个简单的**工厂模型**：```Adventurer```类无法主动被声明，其完全只能在```AdventurerManager```类中生成，就像产品只能在工厂中生产出来一样。
 
+此外请注意，**此处的私有构造函数是特殊情况，一般情况下不需要这么写**。
+
 ### 友元的适用情况
 
 友元也是一种强大而使用的功能，使用不当就会破坏类的独立性。因此同样地，和学习如何使用友元一样重要的是知道什么情境下适合使用友元。
@@ -521,7 +523,10 @@ A::staticMethod();
 
 从上面的访问语句中也可看出，静态成员本质上是类的属性，而不是类生成的某个对象的属性。
 
-此外，如果从类生成的某个对象中访问其静态成员，则所有对象共享该类的静态成员。
+此外，有关静态成员有几点注意事项：
+- 如果从类生成的某个对象中访问其静态成员，则所有对象共享该类的静态成员。
+- 静态成员函数没有```this```指针，因而无法访问类的非静态成员。
+- 编译器会在**const**成员函数中阻止对任何非**mutable**成员的修改。(**mutable**在此不作展开)
 
 ### 常量成员(**const**)
 

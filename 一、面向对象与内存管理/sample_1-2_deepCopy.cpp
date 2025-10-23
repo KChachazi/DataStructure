@@ -7,13 +7,13 @@ public:
     int val;
     char *name;
     A(int v, const char *n) : val(v) {
-        name = new char(strlen(n) + 1);
+        name = new char[strlen(n) + 1];
         strcpy(name, n);
     }
 
     // 深拷贝构造函数
     A(const A &other) : val(other.val) {
-        name = new char(strlen(other.name) + 1);
+        name = new char[strlen(other.name) + 1];
         strcpy(name, other.name);
     }
 
@@ -23,7 +23,7 @@ public:
 
         delete[] name; // 释放已有资源
         val = other.val;
-        name = new char(strlen(other.name) + 1);
+        name = new char[(strlen(other.name) + 1)];
         strcpy(name, other.name);
         return *this; // 返回自身以支持链式赋值 a = b = c;
     }
