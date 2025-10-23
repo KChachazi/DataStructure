@@ -1,8 +1,10 @@
 # Updates
 
-续```part1.1.md```继续写
+续```part1-1.md```继续写
 
-前面文章涉及了基本的面向对象的四大核心，同时也重点讨论了它们在C++中的实现方式，接下来将对C++ class的细节和行为控制进行进一步的学习探索
+- 2025/10/23: 完成part1-2高级面向对象部分。
+
+前面文章涉及了基本的面向对象的四大核心，同时也重点讨论了它们在C++中的实现方式，接下来将对C++ class的细节和行为控制进行进一步的学习探索。
 
 # 面向对象与内存管理
 
@@ -489,41 +491,47 @@ Name: Charlie, Level: 15
 
 ### 静态成员(**static**)
 
-### 常量成员(**const**)
+**static**关键字本身在C语言中存在，在C++面向对象中增加了一种完全不同的功能。在类中，**static**修饰的成员称为静态成员。
 
+> 静态成员是类的属性，而不是类生成的任何一个对象的属性。
 
-
-## 四、静态成员与常量成员
-
-### 1. 静态成员（`static`）
-
-* 属于**类本身**而非某个对象；
-* 所有对象共享同一份静态成员；
-* 可通过类名直接访问。
+我们通过一个实例来理解上面这句话。
 
 ```cpp
-class Adventurer {
-private:
-    static int count_; // 声明
+class A {
 public:
-    Adventurer() { ++count_; }
-    ~Adventurer() { --count_; }
-
-    static int getCount() { return count_; }
+    static int staticVar;
+    static void staticMethod() {
+        std::cout << "Static Method called. Static Variable: " << staticVar << std::endl;
+    }
 };
-
-int Adventurer::count_ = 0; // 类外定义
+int A::staticVar = 0;
 ```
 
-> ✅ **用途：**
-> 统计对象数量、缓存共享资源、工厂模式中的全局计数器等。
+注意，上面的```int A::staticVar = 0;```是必须的，因为静态成员变量属于类而不是类的某个对象，所以需要在类外进行定义和初始化。这一步之所以必须是因为在类中该变量进行了声明，但是没有定义，在内存中不存在其位置，进而链接器找不到其定义。
 
----
+在C++17及之后的标准中，可以在类内添加**inline**关键字，在类中直接通过```inline int A::staticVar = 0;```进行初始化，详细编译原理可以自行查询。
 
-### 2. 常量成员（`const`）
+如果要访问类的静态成员，可以参考下面的语句。
 
-* 用于声明不应修改的对象或方法。
-* 常量成员函数（在函数名后加 `const`）表示不会改变对象状态。
+```cpp
+A::staticVar = 10;
+A::staticMethod();
+```
+
+从上面的访问语句中也可看出，静态成员本质上是类的属性，而不是类生成的某个对象的属性。
+
+此外，如果从类生成的某个对象中访问其静态成员，则所有对象共享该类的静态成员。
+
+### 常量成员(**const**)
+
+在编码时，有些变量是常量，不希望被修改；有些函数仅访问，不允许修改对象状态。因而，**const**关键字出现了。
+
+**const**关键字的作用在于：
+- 用于声明不应修改的对象或方法。
+- 常量成员函数（在函数名后加```const```）表示该函数不会(也不能)改变对象状态。
+
+具体来看下面的例子：
 
 ```cpp
 class Adventurer {
@@ -533,19 +541,14 @@ private:
 public:
     Adventurer(int id, int level) : id_(id), level_(level) {}
 
-    int getID() const { return id_; }   // ✅ 可在 const 对象上调用
-    void setLevel(int l) { level_ = l; } // 非 const 函数
+    int getID() const { return id_; }
+    void setLevel(int l) { level_ = l; }
 };
 ```
 
-> ⚠️ 若函数未标记 `const`，则不能在常量对象上调用。
-> 例如：
->
-> ```cpp
-> const Adventurer a(1, 10);
-> a.getID();   // OK
-> a.setLevel(20); // ❌ 编译错误
-> ```
+在这个例子中，一旦一个```Adventurer```类的对象经过构造函数生成，随后其内部成员```const int id_;```的值将永不再变化。
+
+另：```#define```在部分情况下也能实现这种功能，但是区别在于**const**关键字同时定义了数据类型，因而更精确；**define**则只是简单的文本替换。
 
 ## 附：C++ 可重载运算符完整表格
 
