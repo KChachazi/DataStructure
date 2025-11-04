@@ -2,9 +2,11 @@
 
 续```part1-2.md```继续写
 
+- 2025/11/4: 完成part1-3**C++对象模型**部分。
+
 前面文章涉及了更加高级的面向对象的细节和行为控制，主要包含深/浅拷贝、运算符重载、友元机制、静态成员、常量成员。
 
-接下来将基本结束面向对象部分，介绍**C++对象模型**。
+接下来将结束面向对象部分，介绍**C++对象模型**，从思想的角度试图对C++的面向对象思想做出阐释。
 
 # 面向对象与内存管理
 
@@ -12,7 +14,7 @@
 
 ### 前言
 
-笔者选择性阅读了许多相关资料，也针对其中的问题向某些大模型进行提问。起初笔者认为**C++对象模型**不过是对前面涉及到的大部分内容进行一个总的概述，但是以此开始着笔就发现其作为一个**模型**，仅从内容来看找不到主心骨。于是笔者进一步进行思考和查询，也开始理解**C++对象模型**在讲些什么。
+笔者选择性阅读了许多相关资料，也针对其中的问题向某些大模型进行提问。起初笔者认为**C++对象模型**只是对类与对象机制的再总结，但在进一步阅读与思考后发现，它的本质是一个关于“语言语义如何落实为内存结构与行为机制”的模型。
 
 基于笔者的思考过程，本节的小标题会与前文不同，以一个个问题形式引出。这也是因为**C++对象模型**是一种“设计方案”，从设计初衷到解决问题到最终实现的过程比单纯分析最终设计重要得多。
 
@@ -107,21 +109,14 @@ Counter counter;
 
 #### 多态和vtable如何工作？
 
+C++对象模型中的多态指的是运行时多态，在运行时确定该变量的类型后才会决定使用哪一种函数。支持这种运行时多态的基本语法是虚函数。当类中存在虚函数时，编译器会自动为类生成：
 
-#### 对象的生命周期如何管理？
+- `vtable`(虚函数表)：存储虚函数地址
+- `vptr`(虚表指针)：**每个对象**包含一个隐式变量指针指向该类的`vtable`
 
+##### 虚函数表行为：动态绑定机制
 
-
-## 3. 虚函数与虚函数表（vtable）
-
-### 🧠 动态绑定机制
-
-当类中存在虚函数时，编译器为类生成：
-
-* **vtable（虚函数表）**：存储虚函数地址；
-* **vptr（虚表指针）**：每个对象包含一个隐藏指针指向该类的 vtable。
-
-### 🧩 示例 3：虚函数表行为
+其行为可以由下面的代码展示：
 
 ```cpp
 #include <iostream>
@@ -143,81 +138,103 @@ int main() {
 }
 ```
 
-### 🔍 分析
+在上面的实例中，当通过 `Base*` 调用 `speak()` 时，运行时通过 `vptr` 查表找到 `Derived::speak()`。如果没有虚函数，则静态绑定：`Base::speak()`。
 
-* 当通过 `Base*` 调用 `speak()` 时，运行时通过 `vptr` 查表找到 `Derived::speak`。
-* 如果没有虚函数，则静态绑定：`Base::speak`。
+##### 构造与析构中的虚表绑定
 
----
+在构造和析构阶段，对象的类型尚未完全建立（或已部分销毁），因此：**在构造/析构中调用虚函数不会发生多态行为**。
 
-## 4. 构造与析构中的虚表绑定
+这部分已经在前文中有所介绍。
 
-### 🧠 原理
-
-在构造和析构阶段，对象的类型尚未完全建立（或已部分销毁），
-因此：
-
-> 在构造/析构中调用虚函数不会发生多态行为。
-
-### 🧩 示例 4：
-
-```cpp
-#include <iostream>
-class Base {
-public:
-    Base() { speak(); }       // 构造中调用虚函数
-    virtual void speak() { std::cout << "Base ctor speak\n"; }
-    virtual ~Base() { speak(); } // 析构中调用虚函数
-};
-
-class Derived : public Base {
-public:
-    Derived() { speak(); }
-    void speak() override { std::cout << "Derived speak\n"; }
-};
-
-int main() {
-    Derived d;
-}
-```
-
-**输出：**
-
-```
-Base ctor speak
-Derived speak
-Base dtor speak
-```
-
-> 构造期间，对象仍是 Base 类型；析构期间，对象已降级为 Base。
-> 因此虚函数在这两个阶段表现为静态绑定。
-
----
-
-## 5. 多继承下的对象布局（可选补充）
+##### 多继承下的对象布局
 
 当多继承中每个基类都有虚函数时，对象中会存在多个 vptr。
+
+对于如下的实例：
 
 ```cpp
 class A { public: virtual void f(){} };
 class B { public: virtual void g(){} };
-class C : public A, public B {};
+class C : public A, public B {int val; };
 ```
 
 C 的对象结构大致如下：
 
 ```
-+--------------------+
-| vptr_A → A::vtable |
-| vptr_B → B::vtable |
-| A's members         |
-| B's members         |
-+--------------------+
+vptr_A → A::vtable
+vptr_B → B::vtable
+A's members
+B's members
+C's members
 ```
 
----
+##### 棱形继承
 
-## 6. 小结
+```cpp
+class Base {
+public:
+    int base;
+    Base(int b) : base(b) {}
+    virtual void show() {
+        std::cout << "Base class base: " << base << std::endl;
+    }
+};
+
+class Base1 : public Base {
+public:
+    int base1;
+    Base1(int b, int b1) : Base(b), base1(b1) {}
+    void show() override {
+        std::cout << "Base1 class base1: " << base1 << std::endl;
+    }
+};
+
+class Base2 : public Base {
+public:
+    int base2;
+    Base2(int b, int b2) : Base(b), base2(b2) {}
+    void show() override {
+        std::cout << "Base2 class base2: " << base2 << std::endl;
+    }
+};
+
+class Derived : public Base1, public Base2 {
+public:
+    int derived;
+    Derived(int b1, int b2, int b, int d) 
+        : Base1(b1, b), Base2(b2, b), derived(d) {}
+    void show() override {
+        std::cout << "Derived class derived: " << derived << std::endl;
+    }
+};
+```
+
+在上面的代码中，`B1, B2`类简单继承了基类`B`，因此在派生类`D`中同时含有两个基类`B1, B2`中各自的基类`B`的信息，即间接继承了类`B`两次。这会导致一些歧义问题：
+
+```cpp
+// 错误，Base1与Base2中均含有变量base，因此歧义
+std::cout << obj.base << std::endl;
+
+// 正确
+std::cout << obj.Base1::base << std::endl;
+std::cout << obj.Base2::base << std::endl;
+```
+
+##### 虚继承和虚基类指针
+
+为了解决棱形继承中的问题，
+
+相对比较重要，挖坑，后续补充
+
+#### 对象的生命周期如何管理？
+
+构造时，从基类到派生类，顺序构造；析构时，从派生类到基类，逆序销毁；对象作用域结束时自动调用析构，这就是RAII的基础逻辑。
+
+C++ 通过对象的生命周期模型，将“资源管理”绑定进语义层。这也是 C++ 能实现 RAII（Resource Acquisition Is Initialization）的根基。
+
+在接下来第二部分内存管理中我们会展开较为深入的研究。
+
+### 小结
 
 | 概念      | 含义       | 内存表现             |
 | ------- | -------- | ---------------- |
@@ -228,16 +245,3 @@ C 的对象结构大致如下：
 | vptr    | 指向虚函数表   | 每个含虚函数类的对象各有一份   |
 | vtable  | 存放虚函数地址  | 每个类一张表           |
 
----
-
-## 7. 过渡展望：从对象模型到 RAII
-
-> 对象模型告诉我们**对象的结构与行为绑定机制**。
-> 接下来，我们将探讨**如何利用对象的生命周期管理资源**——
-> 这就是 C++ 的核心哲学：**RAII（资源获取即初始化）**。
-
----
-
-是否希望我接下来帮你继续写出下一节——
-《RAII（资源获取即初始化）思想》的完整模板？
-（会与这节衔接自然，且成为第二章的开篇）
