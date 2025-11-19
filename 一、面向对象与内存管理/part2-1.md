@@ -251,9 +251,99 @@ Custom delete operator called.
 
 接下来我们主要的讨论将限制在 **RAII** 思想在内存管理上的应用，进而**最核心、最常用**的也就是`std::unique_ptr, std::shared_ptr, std::weak_ptr`。
 
+### `std::{unique, shared, weak}_ptr`概述
+
 ### `std::unique_ptr`
 
+`std::unique_ptr` 是C++11引入的智能指针，是自动内存管理的核心工具，提供了异常安全的RAII语义，能够自动管理对象的生命周期，防止内存泄漏。
+
+`std::unique_ptr`具有对动态分配内存对象的**独占所有权**——只有一个 `unique_ptr` 可以指向它。这一特性使得它**不支持拷贝，只支持转移所有权/移动语义**。当`unique_ptr`被销毁时会**自动释放资源**。而且在实现上面这些好处的同时，使用`unique_ptr`还是零开销的，提供便利而不牺牲性能。
+
+#### 创建对象
+
+我们下面的讨论均以`Sample`类为例，`Sample`类构造如下：
+
+```cpp
+class Sample {
+public:
+    Sample() { std::cout << "Sample Constructor" << std::endl; }
+    ~Sample() { std::cout << "Sample Destructor" << std::endl; }
+    void display() { std::cout << "Display Sample" << std::endl; }
+};
+```
+
+创建一个 ``unique_ptr`` 管理 ``Sample`` 对象主要有四种方式：
+1. 使用 `new`
+    这种方法在出现异常时会造成内存泄漏。
+    ```cpp
+    std::unique_ptr<Sample> ptr(new Sample());
+    ```
+2. 默认构造函数创建一个空的 `unique_ptr`，使用 `reset` 方法分配新的对象
+    ```cpp
+    std::unique_ptr<Sample> ptr;
+    ptr.reset(new Sample());
+    ```
+3. 直接传入裸指针
+    这种方法可以直接接管已有的指针，但是需要注意不会重复释放。
+    ```cpp
+    Sample *rawptr = new Sample(); std::unique_ptr<Sample> ptr(rawptr);
+    ```
+4. 使用 `std::make_unique` 构造(推荐，C++14及以上)
+    保证异常安全，避免内存泄漏，最推荐的方式。
+    ```cpp
+    std::unique_ptr<Sample> ptr = std::make_unique<Sample>();
+    ```
+
+#### 访问对象
+
+访问对象的方式与常规的指针相似，都可以使用解引用操作符`*`和箭头操作符`->`。
+
+具体演示在下面的完整实例中出现。
+
+#### 所有权管理
+
+前文提到，`std::unique_ptr`具有对动态分配内存对象的**独占所有权**。这种所有权只能转移或消亡。要对所有权进行操作主要有下面几种方式：
+1. `std::move()`    ：转移指针所有权。
+    ```cpp
+    std::unique_ptr<Sample> ptr1 = make_unique<Sample>();
+    std::unique_ptr<Sample> ptr2 = std::move(ptr1);
+    // 之后 ptr1 变为 nullptr, ptr2 获得所有权
+    ``
+1. `release()`      ：释放`std::unique_ptr`的所有权到原生指针，此时`std::unique_ptr`不会自动释放内存，需要手动释放。
+    ```cpp
+    std::unique_ptr<Sample> ptr = make_unique<Sample>();
+    int *rawptr = ptr.release();
+    // 之后 ptr 变为 nullptr, rawptr 指向 ptr 原本对应的对象
+    // 若要释放该内存必须使用 delete ptr;
+    ```
+1. `reset() / reset(make_unique<T>())`：对于前者，删除当前对象；对于后者，删除当前对象并将指针指向新对象。
+    ```cpp
+    std::unique_ptr<Sample> ptr = make_unique<Sample>();
+    ptr.reset();                // 删除当前对象, ptr 变为 nullptr
+    ptr.teset(new Sample());    // 删除当前对象, ptr 指向新对象
+    ```
+1. `std::swap()`：交换两指针的所有权。
+    ```cpp
+    std::unique_ptr<Sample> ptr1 = make_unique<Sample>();
+    std::unique_ptr<Sample> ptr2 = make_unique<Sample>();
+    std::swap(ptr1, ptr2);
+    ```
+
+#### 扩展
+
+除了上面的基础功能以外，`std::unique_ptr`还能支持自定义删除器，支持数组，受篇幅限制此处不做展开。
+
 ### `std::shared_ptr`
+
+`std::shared_ptr` 也是C++11引入的智能指针，用于管理动态分配的内存。
+
+`std::shared_ptr` 通过引用计数机制实现多个指针共享同一个对象的所有权。当最后一个指向该对象的 `std::shared_ptr` 被销毁时，对象会被自动删除。
+
+#### 创建对象
+
+和 `std::unique_ptr` 类似，尽管存在构造函数可以用于常见对象，还是更推荐使用异常安全的 `std::make_shared<T>()` 创建此类对象。
+
+
 
 ### `std::weak_ptr`
 
