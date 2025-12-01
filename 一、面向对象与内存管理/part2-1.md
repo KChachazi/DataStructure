@@ -308,7 +308,7 @@ public:
     std::unique_ptr<Sample> ptr1 = make_unique<Sample>();
     std::unique_ptr<Sample> ptr2 = std::move(ptr1);
     // 之后 ptr1 变为 nullptr, ptr2 获得所有权
-    ``
+    ```
 1. `release()`      ：释放`std::unique_ptr`的所有权到原生指针，此时`std::unique_ptr`不会自动释放内存，需要手动释放。
     ```cpp
     std::unique_ptr<Sample> ptr = make_unique<Sample>();
@@ -632,7 +632,158 @@ if (wp.expired()) {
     ```
 #### 解决循环引用
 
+有了`weak_ptr`之后，我们就可以调整先前循环引用示例中的`SampleA, SampleB`的构造样例，解决循环引用问题。
 
+```cpp
+class SampleA {
+public:
+    int data;
+    std::shared_ptr<class SampleB> ptrB;
+    SampleA(int val, std::shared_ptr<class SampleB> bPtr) : data(val), ptrB(bPtr) { std::cout << "SampleA Constructor" << '\n'; }
+    ~SampleA() { std::cout << "SampleA Destructor" << '\n'; }
+};
+
+class SampleB {
+public:
+    int data;
+    std::weak_ptr<SampleA> ptrA; // 使用 weak_ptr 防止循环引用
+    SampleB(int val, std::shared_ptr<SampleA> aPtr) : data(val), ptrA(aPtr) { std::cout << "SampleB Constructor" << '\n'; }
+    ~SampleB() { std::cout << "SampleB Destructor" << '\n'; }
+};
+
+int main() {
+    {
+        std::shared_ptr<SampleA> aPtr = std::make_shared<SampleA>(1, nullptr);
+        std::shared_ptr<SampleB> bPtr = std::make_shared<SampleB>(2, aPtr);
+        aPtr->ptrB = bPtr;
+        std::cout << "SampleA counter: " << aPtr.use_count() << '\n'; // 由于SampleB中使用 weak_ptr ，值为1
+        std::cout << "SampleB counter: " << bPtr.use_count() << '\n'; // SampleA 和 SampleB 互相引用，但不会导致内存泄漏
+    }
+
+    return 0;
+}
+```
+
+运行上面的代码后可以得到输出如下：
+```text
+SampleA Constructor
+SampleB Constructor
+SampleA counter: 1
+SampleB counter: 2
+SampleA Destructor
+SampleB Destructor
+```
 
 ## 三/五法则和零法则
 
+### 三法则（Rule of Three）
+
+如果类中定义了以下任意一个函数：
+- 拷贝构造函数
+- 拷贝赋值运算符
+- 析构函数
+
+就应该显式定义另外两个，以实现**资源的正确管理（分配、复制、释放）**。
+
+以下是一个违反三法则的实例：
+
+```cpp
+class String {
+    char* data;
+public:
+    String(const char* s) {
+        data = new char[strlen(s) + 1];
+        strcpy(data, s);
+    }
+    ~String() { delete[] data; }
+};
+
+int main() {
+    String s1("abc");
+    String s2 = s1; // 默认拷贝构造（浅拷贝）
+}
+```
+
+显而易见的是，上面代码运行的结果为两个对象共享同一内存块，析构时重复释放。
+
+### 五法则（Rule of Five）
+
+在 C++11 引入移动语义后，三法则扩展为五法则：
+1. 拷贝构造函数
+2. 拷贝赋值运算符
+3. 析构函数
+4. 移动构造函数
+5. 移动赋值运算符
+
+以下是一个五法则的实例：
+
+```cpp
+#include <iostream>
+#include <cstring>
+
+class String {
+    char* data;
+public:
+    String(const char* s = "") {
+        data = new char[strlen(s) + 1];
+        strcpy(data, s);
+    }
+    ~String() { delete[] data; }
+
+    // 拷贝构造
+    String(const String& other) {
+        data = new char[strlen(other.data) + 1];
+        strcpy(data, other.data);
+    }
+
+    // 拷贝赋值
+    String& operator=(const String& other) {
+        if (this != &other) {
+            delete[] data;
+            data = new char[strlen(other.data) + 1];
+            strcpy(data, other.data);
+        }
+        return *this;
+    }
+
+    // 移动构造
+    String(String&& other) noexcept : data(other.data) {
+        other.data = nullptr;
+    }
+
+    // 移动赋值
+    String& operator=(String&& other) noexcept {
+        if (this != &other) {
+            delete[] data;
+            data = other.data;
+            other.data = nullptr;
+        }
+        return *this;
+    }
+};
+```
+
+### 零法则（Rule of Zero）
+
+**如果一个类的所有成员都能自动正确管理其资源，那么你就无需手动定义析构、拷贝或移动函数。**
+
+从上面的一句话可以看出零法则的最终目的是让类的所有成员自动管理自己的资源，进而就不需要在类的角度上实现资源管理。
+
+例如一个如下的实例：
+
+```cpp
+#include <string>
+class Person {
+    std::string name; // 自动管理资源
+};
+```
+
+这个类非常简单，不必写任何特殊函数，因为 `std::string` 已经遵循 RAII 与五法则。
+
+### 总结
+
+| 法则  | 含义             | 目的         |
+| --- | -------------- | ---------- |
+| 三法则 | 构造、赋值、析构应成组出现  | 防止资源管理不对称  |
+| 五法则 | 加入移动语义后的三法则升级版 | 提升性能与安全性   |
+| 零法则 | 依赖成员的 RAII 行为  | 让类设计更简洁、安全 |

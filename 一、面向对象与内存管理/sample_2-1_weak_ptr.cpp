@@ -8,29 +8,30 @@ public:
     Sample(int val) : data(val) { std::cout << "Sample Parameterized Constructor" << '\n'; }
     ~Sample() { std::cout << "Sample Destructor" << '\n'; }
     void display() {
-        std::cout << "Display Sample" << '\n';
-        std::cout << "Data: " << data << '\n';
+        std::cout << "Display Sample -> Data: " << data << '\n';
     }
 };
 
 int main() {
-    std::shared_ptr<Sample> ptr1 = std::make_shared<Sample>(42);
+    std::shared_ptr<Sample> sptr1 = std::make_shared<Sample>(1);
+    sptr1->display();
+    std::shared_ptr<Sample> sptr2 = std::make_shared<Sample>(2);
+    sptr2->display();
+    std::weak_ptr<Sample> wptr1 = sptr1;
+    std::weak_ptr<Sample> wptr2 = sptr2;
 
-    {
-        std::shared_ptr<Sample> ptr2 = ptr1; // Shared ownership
-        std::shared_ptr<Sample> ptr3(ptr1);  // Another way to share ownership
-        std::cout << "Reference Count: " << ptr1.use_count() << '\n';
-        ptr2->display();
-        ptr3->display();
-    } // ptr2, ptr3 goes out of scope here
-
-    std::cout << "Reference Count after ptr2 is out of scope: " << ptr1.use_count() << '\n';
-
-    std::shared_ptr<Sample> ptr4 = ptr1;            // Shared ownership again
-    std::shared_ptr<Sample> p = std::move(ptr1);    // Transfer ownership to p
-    std::cout << "Reference Count after move(Count from p): " << p.use_count() << '\n';
-    std::cout << "Reference Count after move(Count from ptr4): " << ptr4.use_count() << '\n';
-    std::cout << "Is ptr1 null after move? " << (ptr1 == nullptr ? "Yes" : "No") << '\n';
+    if (auto spt = wptr1.lock()) {
+        std::cout << "using weak_ptr to access shared_ptr data: ";
+        spt->display();
+    } else {
+        std::cout << "wptr1 is expired" << '\n';
+    }
+    if (auto spt = wptr2.lock()) {
+        std::cout << "using weak_ptr to access shared_ptr data: ";
+        spt->display();
+    } else {
+        std::cout << "wptr2 is expired" << '\n';
+    }
 
     return 0;
 }
