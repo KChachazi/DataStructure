@@ -1,10 +1,14 @@
 # Updates
 
-续```part2-1.md```继续写
+续```part1-3.md```继续写
+
+- 2025/12/1: 完成part2-1**C++内存管理**上半部分。
 
 前面`part1`的一系列文章将C++面向对象的基本内容介绍完毕，接下来我们将探讨C++中有关内存管理的概念和方式方法。
 
 接下来的内容主要包含，栈与堆的内存分配，`new/delete`与`malloc/free`，**RAII思想**，三/五法则和零法则。
+
+# 面向对象与内存管理
 
 ## 引言
 
@@ -113,6 +117,8 @@ F = malloc(250);
 - 内存利用率
 
 这三点构成了一个性能三角，不同的算法需要在这个三角中寻找一个平衡点。原本笔者期待在这里学习同时编写有关内存分配主流算法的思路，权衡，甚至实现，不过其内容涵盖完全可以作为单独一篇文章，因此挖坑，后续可能会出ex篇来介绍。
+
+也正是因为堆分配需要执行一定的算法——需要进入分配器逻辑 → 链表/树搜索 → 元数据维护 → 分配块拆分或合并——所以堆内存的分配必然比栈内存要更慢。
 
 ### 栈与堆的分配区别
 
@@ -236,6 +242,8 @@ Custom delete operator called.
 
 这个输出与先前的描述是对应的。
 
+此外需要注意: `malloc` 与 `new` 混用会导致未定义行为，但 `new/delete` 之间可以混用，必须保证 “`operator new` 对应 `operator delete`”。
+
 ### Placement new(定位new)
 
 挖坑
@@ -274,7 +282,7 @@ public:
 
 创建一个 ``unique_ptr`` 管理 ``Sample`` 对象主要有四种方式：
 1. 使用 `new`
-    这种方法在出现异常时会造成内存泄漏。
+    这种方法在出现异常时会造成内存泄漏，具体机制为：若在构造 T 时抛异常，则不会进入 `unique_ptr` 构造，而 `raw pointer` 会泄漏。
     ```cpp
     std::unique_ptr<Sample> ptr(new Sample());
     ```
@@ -320,7 +328,7 @@ public:
     ```cpp
     std::unique_ptr<Sample> ptr = make_unique<Sample>();
     ptr.reset();                // 删除当前对象, ptr 变为 nullptr
-    ptr.teset(new Sample());    // 删除当前对象, ptr 指向新对象
+    ptr.reset(new Sample());    // 删除当前对象, ptr 指向新对象
     ```
 1. `std::swap()`：交换两指针的所有权。
     ```cpp
@@ -333,7 +341,11 @@ public:
 
 #### 扩展
 
-除了上面的基础功能以外，`std::unique_ptr`还能支持自定义删除器，支持数组，受篇幅限制此处不做展开。
+除了上面的基础功能以外，`std::unique_ptr`还能支持自定义删除器，支持数组，如下面一个文件流的实例。
+
+```cpp
+std::unique_ptr<FILE, decltype(&fclose)> file(fopen("data.txt","r"), fclose);
+```
 
 ### `std::shared_ptr`
 
@@ -357,7 +369,7 @@ public:
     ptr.reset(new Sample());
     ```
 3. 直接传入裸指针
-    这种方法可以直接接管已有的指针，但是需要注意不会重复释放。
+    这种方法可以直接接管已有的指针，但是需要注意多个 `shared_ptr` 不可从同一个 `raw pointer` 构造，否则造成重复释放。
     ```cpp
     Sample *rawptr = new Sample(); std::shared_ptr<Sample> ptr(rawptr);
     ```
@@ -767,7 +779,7 @@ public:
 
 **如果一个类的所有成员都能自动正确管理其资源，那么你就无需手动定义析构、拷贝或移动函数。**
 
-从上面的一句话可以看出零法则的最终目的是让类的所有成员自动管理自己的资源，进而就不需要在类的角度上实现资源管理。
+从上面的一句话可以看出零法则的最终目的是让类的所有成员自动管理自己的资源，进而就不需要在类的角度上实现资源管理。遵循**零法则**的类往往由 STL 容器、智能指针、`std::string`、`vector` 等自动管理资源的成员构成，因此无需自定义析构、拷贝、移动逻辑。
 
 例如一个如下的实例：
 
