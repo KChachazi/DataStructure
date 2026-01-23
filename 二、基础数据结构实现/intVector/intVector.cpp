@@ -17,13 +17,8 @@ intVector::intVector(const intVector& other) : _data(new int[other._capacity]), 
 }
 
 intVector& intVector::operator=(const intVector& other) {
-    if (this != &other) {
-        delete[] _data;
-        _data = new int[other._capacity];
-        _size = other._size;
-        _capacity = other._capacity;
-        std::memcpy(_data, other._data, _size * sizeof(int));
-    }
+    intVector temp(other);
+    swap(temp);
     return *this;
 }
 
@@ -110,14 +105,16 @@ void intVector::reserve(size_t newCapacity) {
 }
 
 void intVector::reallocate(size_t newCapacity) {
-    int *newData = new int[newCapacity];
-    if (_data) {
-        std::memcpy(newData, _data, _size * sizeof(int));
-        delete[] _data;
+    if (newCapacity < _size) {
+        throw std::length_error("newCapacity < _size");
     }
+
+    int *newData = new int[newCapacity];
+
+    std::memcpy(newData, _data, _size * sizeof(int));
+    delete[] _data;
     _data = newData;
     _capacity = newCapacity;
-    // _size remains unchanged
 }
 
 void intVector::push_back(int value) {
@@ -146,4 +143,22 @@ const int* intVector::begin() const {
 
 const int* intVector::end() const {
     return _data + _size;
+}
+
+void intVector::resize(size_t newSize) {
+    size_t newCapacity = _capacity;
+    if (_capacity < newSize) {
+        newCapacity = std::max(newSize, _capacity * 2);
+        reallocate(newCapacity);
+    }
+    if (newSize > _size) {
+        std::fill(_data + _size, _data + newSize, 0);
+    }
+    _size = newSize;
+}
+
+void intVector::swap(intVector& other) noexcept {
+    std::swap(_data, other._data);
+    std::swap(_size, other._size);
+    std::swap(_capacity, other._capacity);
 }

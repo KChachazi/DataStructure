@@ -42,6 +42,7 @@ public:
     void clear();
     void reserve(size_t newCapacity);
     void resize(size_t newSize);
+    void swap(intVector& other) noexcept;
 
     // iterators
     using iterator = int*;
