@@ -16,9 +16,8 @@ intVector::intVector(const intVector& other) : _data(new int[other._capacity]), 
     std::memcpy(_data, other._data, _size * sizeof(int));
 }
 
-intVector& intVector::operator=(const intVector& other) {
-    intVector temp(other);
-    swap(temp);
+intVector& intVector::operator= (intVector other) {
+    swap(other);
     return *this;
 }
 
@@ -26,19 +25,6 @@ intVector::intVector(intVector&& other) noexcept : _data(other._data), _size(oth
     other._data = nullptr;
     other._size = 0;
     other._capacity = 0;
-}
-
-intVector& intVector::operator=(intVector&& other) noexcept {
-    if (this != &other) {
-        delete[] _data;
-        _data = other._data;
-        _size = other._size;
-        _capacity = other._capacity;
-        other._data = nullptr;
-        other._size = 0;
-        other._capacity = 0;
-    }
-    return *this;
 }
 
 size_t intVector::size() const {

@@ -14,11 +14,9 @@ public:
     intVector();
     ~intVector();
     explicit intVector(size_t size);
+    intVector& operator= (intVector other);
     intVector(const intVector& other);
-    intVector& operator=(const intVector& other);
-    // Move constructor and move assignment operator
     intVector(intVector&& other) noexcept;
-    intVector& operator=(intVector&& other) noexcept;
 
     // stute functions
     size_t size() const;
