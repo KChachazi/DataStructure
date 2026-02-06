@@ -104,5 +104,71 @@ int main() {
         std::cerr << "Exception caught: " << e.what() << "\n";
     }
 
+    try {
+        print_separator("Test 5: Insert (Modifiers)");
+        myVector<int> v;
+        v.push_back(1);
+        v.push_back(2);
+        v.push_back(4);
+        
+        std::cout << "-- Initial: 1 2 4 --\n";
+        
+        std::cout << "-- insert(begin()+2, 3) --\n";
+        auto it = v.insert(v.begin() + 2, 3);
+        std::cout << "Ret val: " << *it << "\n";
+        
+        std::cout << "-- insert(begin(), 0) --\n";
+        v.insert(v.begin(), 0);
+
+        std::cout << "-- insert(end(), 5) --\n";
+        v.insert(v.end(), 5);
+
+        std::cout << "v: ";
+        for(size_t i=0; i<v.size(); ++i) std::cout << v[i] << " ";
+        std::cout << "\n(Expected: 0 1 2 3 4 5)\n";
+
+        print_separator("Test 6: Erase (Modifiers)");
+        // Current: 0 1 2 3 4 5
+        std::cout << "-- erase(begin()) -> Remove 0 --\n";
+        v.erase(v.begin());
+        
+        std::cout << "-- erase(end()-1) -> Remove 5 --\n";
+        v.erase(v.end() - 1);
+
+        std::cout << "-- erase(begin()+1, begin()+3) -> Remove 2, 3 --\n";
+        // Current: 1 2 3 4
+        // Index:   0 1 2 3
+        v.erase(v.begin() + 1, v.begin() + 3);
+
+        std::cout << "v: ";
+        for(size_t i=0; i<v.size(); ++i) std::cout << v[i] << " ";
+        std::cout << "\n(Expected: 1 4)\n";
+
+        print_separator("Test 7: Resize");
+        // Current v: 1 4 (size 2)
+        std::cout << "-- resize(5, 10) -> Grow with value 10 --\n";
+        v.resize(5, 10);
+        std::cout << "v size: " << v.size() << ", cap: " << v.capacity() << "\n";
+        std::cout << "v: ";
+        for(size_t i=0; i<v.size(); ++i) std::cout << v[i] << " ";
+        std::cout << "\n(Expected: 1 4 10 10 10)\n";
+
+        std::cout << "-- resize(3) -> Shrink --\n";
+        v.resize(3);
+        std::cout << "v size: " << v.size() << "\n";
+        std::cout << "v: ";
+        for(size_t i=0; i<v.size(); ++i) std::cout << v[i] << " ";
+        std::cout << "\n(Expected: 1 4 10)\n";
+
+        std::cout << "-- resize(6) -> Grow with default Ctor (0) --\n";
+        v.resize(6);
+        std::cout << "v: ";
+        for(size_t i=0; i<v.size(); ++i) std::cout << v[i] << " ";
+        std::cout << "\n(Expected: 1 4 10 0 0 0)\n";
+
+    } catch (const std::exception& e) {
+        std::cerr << "Modifiers Exception caught: " << e.what() << "\n";
+    }
+
     return 0;
 }
