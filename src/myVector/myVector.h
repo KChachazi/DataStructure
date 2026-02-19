@@ -6,6 +6,8 @@
 #include <new>          // placement new
 #include <stdexcept>    // std::out_of_range
 #include <memory>       // std::allocator, std::allocator_traits
+#include <type_traits>  // std::is_trivially_copyable
+#include <cstring>      // std::memcpy
 
 template <typename T, typename Alloc = std::allocator<T>>
 class myVector {
@@ -438,18 +440,24 @@ void myVector<T, Alloc>::reallocate(size_t newCapacity) {
     T* newData = traits::allocate(allocator, newCapacity); 
     
     // 2. 尝试在新内存上构造元素
-    size_t i = 0;
-    try {
-        for (; i < _size; i ++) {
-            traits::construct(allocator, &newData[i], std::move_if_noexcept(_data[i]));
+    // 性能优化
+    // 编译器分支(C++17)：如果 T 是 trivially copyable 的，则直接 memcpy；否则逐个 move 构造
+    if constexpr (std::is_trivially_copyable_v<T>) {
+        std::memcpy(newData, _data, _size * sizeof(T));
+    } else {
+        size_t i = 0;
+        try {
+            for (; i < _size; i ++) {
+                traits::construct(allocator, &newData[i], std::move_if_noexcept(_data[i]));
+            }
+        } catch (...) {
+            // 回滚: 销毁已构造的新元素，释放新内存
+            for (size_t j = 0; j < i; j ++) {
+                traits::destroy(allocator, &newData[j]);
+            }
+            traits::deallocate(allocator, newData, newCapacity);
+            throw; // 重新抛出异常，保持 Strong Guarantee
         }
-    } catch (...) {
-        // 回滚: 销毁已构造的新元素，释放新内存
-        for (size_t j = 0; j < i; j ++) {
-            traits::destroy(allocator, &newData[j]);
-        }
-        traits::deallocate(allocator, newData, newCapacity);
-        throw; // 重新抛出异常，保持 Strong Guarantee
     }
 
     // 3. 释放旧资源

@@ -1,1 +1,0 @@
-intVector 作为一个阶段目标，是 Vector 的最小可行实现。
