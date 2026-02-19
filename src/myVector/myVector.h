@@ -5,8 +5,9 @@
 #include <utility>      // std::move
 #include <new>          // placement new
 #include <stdexcept>    // std::out_of_range
+#include <memory>       // std::allocator, std::allocator_traits
 
-template <typename T>
+template <typename T, typename Alloc = std::allocator<T>>
 class myVector {
 private:
     T*      _data;      // 指向原始内存（不是“数组”）
@@ -61,6 +62,9 @@ public:
 
 private:
     /* ===== 内部工具 ===== */
+    Alloc allocator;
+    using traits = std::allocator_traits<Alloc>;
+    // [[no_unique_address]] Alloc allocator; // C++20 可用，节省空间
     void allocate(size_t n);
     void construct_at(size_t index);
     void construct_at(size_t index, const T& value);
@@ -70,6 +74,9 @@ private:
     void reallocate(size_t newCapacity);
     void destroy_at(size_t index);
     void destroy_range(size_t from, size_t to);
+
+public:
+    void swap(myVector& other) noexcept;
 };
 
 
@@ -77,18 +84,18 @@ private:
 // Implementation - Constructors / Destructor
 // ==========================================================
 
-template <typename T>
-myVector<T>::myVector() : _data(nullptr), _size(0), _capacity(0) {}
+template <typename T, typename Alloc>
+myVector<T, Alloc>::myVector() : _data(nullptr), _size(0), _capacity(0) {}
 
-template <typename T>
-myVector<T>::~myVector() {
+template <typename T, typename Alloc>
+myVector<T, Alloc>::~myVector() {
     destroy_range(0, _size);
-    operator delete[](static_cast<void*>(_data));
+    traits::deallocate(allocator, _data, _capacity);
 }
 
-template <typename T>
-myVector<T>::myVector(const myVector& other)
-    : _data(nullptr), _size(0), _capacity(0) {
+template <typename T, typename Alloc>
+myVector<T, Alloc>::myVector(const myVector& other)
+    : _data(nullptr), _size(0), _capacity(0), allocator(traits::select_on_container_copy_construction(other.allocator)) {
         if (other._size > 0) {
             allocate(other._capacity);
             for (size_t i = 0; i < other._size; i ++) {
@@ -98,12 +105,12 @@ myVector<T>::myVector(const myVector& other)
         _size = other._size;
     }
 
-template <typename T>
-myVector<T>& myVector<T>::operator=(const myVector& other) {
+template <typename T, typename Alloc>
+myVector<T, Alloc>& myVector<T, Alloc>::operator=(const myVector& other) {
     if (this != &other) {
         clear();
         if (other._size > _capacity) {
-            operator delete[](static_cast<void*>(_data));
+            traits::deallocate(allocator, _data, _capacity);
             allocate(other._capacity);
         }
         for (size_t i = 0; i < other._size; i ++) {
@@ -114,22 +121,23 @@ myVector<T>& myVector<T>::operator=(const myVector& other) {
     return *this;
 }
 
-template <typename T>
-myVector<T>::myVector(myVector&& other) noexcept
-    : _data(other._data), _size(other._size), _capacity(other._capacity) {
+template <typename T, typename Alloc>
+myVector<T, Alloc>::myVector(myVector&& other) noexcept
+    : _data(other._data), _size(other._size), _capacity(other._capacity), allocator(std::move(other.allocator)) {
         other._data = nullptr;
         other._size = 0;
         other._capacity = 0;
     }
 
-template <typename T>
-myVector<T>& myVector<T>::operator=(myVector&& other) noexcept {
+template <typename T, typename Alloc>
+myVector<T, Alloc>& myVector<T, Alloc>::operator=(myVector&& other) noexcept {
     if (this != &other) {
         clear();
-        operator delete[](static_cast<void*>(_data));
+        traits::deallocate(allocator, _data, _capacity);
         _data = other._data;
         _size = other._size;
         _capacity = other._capacity;
+        allocator = std::move(other.allocator);
         other._data = nullptr;
         other._size = 0;
         other._capacity = 0;
@@ -141,23 +149,23 @@ myVector<T>& myVector<T>::operator=(myVector&& other) noexcept {
 // Implementation - Capacity
 // ==========================================================
 
-template <typename T>
-size_t myVector<T>::size() const noexcept {
+template <typename T, typename Alloc>
+size_t myVector<T, Alloc>::size() const noexcept {
     return _size;
 }
 
-template <typename T>
-size_t myVector<T>::capacity() const noexcept {
+template <typename T, typename Alloc>
+size_t myVector<T, Alloc>::capacity() const noexcept {
     return _capacity;
 }
 
-template <typename T>
-bool myVector<T>::empty() const noexcept {
+template <typename T, typename Alloc>
+bool myVector<T, Alloc>::empty() const noexcept {
     return _size == 0;
 }
 
-template <typename T>
-void myVector<T>::resize(size_t newSize) {
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::resize(size_t newSize) {
     if (newSize < _size) {
         destroy_range(newSize, _size);
     }
@@ -176,8 +184,8 @@ void myVector<T>::resize(size_t newSize) {
     _size = newSize;
 }
 
-template <typename T>
-void myVector<T>::resize(size_t newSize, const T& value) {
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::resize(size_t newSize, const T& value) {
     if (newSize < _size) {
         destroy_range(newSize, _size);
     }
@@ -200,49 +208,49 @@ void myVector<T>::resize(size_t newSize, const T& value) {
 // Implementation - Element Access
 // ==========================================================
 
-template <typename T>
-T& myVector<T>::operator[](size_t index) {
+template <typename T, typename Alloc>
+T& myVector<T, Alloc>::operator[](size_t index) {
     return _data[index];
 }
 
-template <typename T>
-const T& myVector<T>::operator[](size_t index) const {
+template <typename T, typename Alloc>
+const T& myVector<T, Alloc>::operator[](size_t index) const {
     return _data[index];
 }
 
-template <typename T>
-T& myVector<T>::at(size_t index) {
+template <typename T, typename Alloc>
+T& myVector<T, Alloc>::at(size_t index) {
     if (index >= _size) {
         throw std::out_of_range("Index out of range");
     }
     return _data[index];
 }
 
-template <typename T>
-const T& myVector<T>::at(size_t index) const {
+template <typename T, typename Alloc>
+const T& myVector<T, Alloc>::at(size_t index) const {
     if (index >= _size) {
         throw std::out_of_range("Index out of range");
     }
     return _data[index];
 }
 
-template <typename T>
-T& myVector<T>::front() {
+template <typename T, typename Alloc>
+T& myVector<T, Alloc>::front() {
     return _data[0];
 }
 
-template <typename T>
-const T& myVector<T>::front() const {
+template <typename T, typename Alloc>
+const T& myVector<T, Alloc>::front() const {
     return _data[0];
 }
 
-template <typename T>
-T& myVector<T>::back() {
+template <typename T, typename Alloc>
+T& myVector<T, Alloc>::back() {
     return _data[_size - 1];
 }
 
-template <typename T>
-const T& myVector<T>::back() const {
+template <typename T, typename Alloc>
+const T& myVector<T, Alloc>::back() const {
     return _data[_size - 1];
 }
 
@@ -250,23 +258,23 @@ const T& myVector<T>::back() const {
 // Implementation - Iterators
 // ==========================================================
 
-template <typename T>
-typename myVector<T>::iterator myVector<T>::begin() noexcept {
+template <typename T, typename Alloc>
+typename myVector<T, Alloc>::iterator myVector<T, Alloc>::begin() noexcept {
     return _data;
 }
 
-template <typename T>
-typename myVector<T>::iterator myVector<T>::end() noexcept {
+template <typename T, typename Alloc>
+typename myVector<T, Alloc>::iterator myVector<T, Alloc>::end() noexcept {
     return _data + _size;
 }
 
-template <typename T>
-typename myVector<T>::const_iterator myVector<T>::begin() const noexcept {
+template <typename T, typename Alloc>
+typename myVector<T, Alloc>::const_iterator myVector<T, Alloc>::begin() const noexcept {
     return _data;
 }
 
-template <typename T>
-typename myVector<T>::const_iterator myVector<T>::end() const noexcept {
+template <typename T, typename Alloc>
+typename myVector<T, Alloc>::const_iterator myVector<T, Alloc>::end() const noexcept {
     return _data + _size;
 }
 
@@ -274,8 +282,8 @@ typename myVector<T>::const_iterator myVector<T>::end() const noexcept {
 // Implementation - Modifiers
 // ==========================================================
 
-template <typename T>
-void myVector<T>::push_back(const T& value) {
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::push_back(const T& value) {
     if (_size >= _capacity) {
         size_t newCapacity = (_capacity == 0) ? 1 : _capacity * 2;
         reallocate(newCapacity);
@@ -284,31 +292,31 @@ void myVector<T>::push_back(const T& value) {
     _size ++;
 }
 
-template <typename T>
-void myVector<T>::pop_back() {
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::pop_back() {
     if (_size > 0) {
         -- _size;
         destroy_at(_size);
     }
 }
 
-template <typename T>
-void myVector<T>::clear() {
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::clear() {
     destroy_range(0, _size);
     _size = 0;
 }
 
-template <typename T>
-void myVector<T>::reserve(size_t newCapacity) {
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::reserve(size_t newCapacity) {
     if (newCapacity <= _capacity) {
         return;
     }
     reallocate(newCapacity);
 }
 
-template <typename T>
+template <typename T, typename Alloc>
 template <typename ... Args>
-void myVector<T>::emplace_back(Args&& ... args) {
+void myVector<T, Alloc>::emplace_back(Args&& ... args) {
     if (_size >= _capacity) {
         size_t newCapacity = (_capacity == 0) ? 1 : _capacity * 2;
         reallocate(newCapacity);
@@ -317,8 +325,8 @@ void myVector<T>::emplace_back(Args&& ... args) {
     _size ++;
 }
 
-template <typename T>
-typename myVector<T>::iterator myVector<T>::insert(const_iterator pos, const T& value) {
+template <typename T, typename Alloc>
+typename myVector<T, Alloc>::iterator myVector<T, Alloc>::insert(const_iterator pos, const T& value) {
     if (pos < begin() || pos > end()) {
         throw std::out_of_range("Insert position out of range");
     }
@@ -338,8 +346,8 @@ typename myVector<T>::iterator myVector<T>::insert(const_iterator pos, const T& 
     return begin() + index;
 }
 
-template <typename T>
-typename myVector<T>::iterator myVector<T>::insert(const_iterator pos, T&& value) {
+template <typename T, typename Alloc>
+typename myVector<T, Alloc>::iterator myVector<T, Alloc>::insert(const_iterator pos, T&& value) {
     if (pos < begin() || pos > end()) {
         throw std::out_of_range("Insert position out of range");
     }
@@ -357,8 +365,8 @@ typename myVector<T>::iterator myVector<T>::insert(const_iterator pos, T&& value
     return begin() + index;
 }
 
-template <typename T>
-typename myVector<T>::iterator myVector<T>::erase(const_iterator pos) {
+template <typename T, typename Alloc>
+typename myVector<T, Alloc>::iterator myVector<T, Alloc>::erase(const_iterator pos) {
     if (pos < begin() || pos >= end()) {
         throw std::out_of_range("Erase position out of range");
     }
@@ -373,8 +381,8 @@ typename myVector<T>::iterator myVector<T>::erase(const_iterator pos) {
     return begin() + index;
 }
 
-template <typename T>
-typename myVector<T>::iterator myVector<T>::erase(const_iterator first, const_iterator last) {
+template <typename T, typename Alloc>
+typename myVector<T, Alloc>::iterator myVector<T, Alloc>::erase(const_iterator first, const_iterator last) {
     if (first < begin() || last > end() || first > last) {
         throw std::out_of_range("Erase range out of range");
     }
@@ -396,72 +404,83 @@ typename myVector<T>::iterator myVector<T>::erase(const_iterator first, const_it
 // Implementation - Internal Tools
 // ==========================================================
 
-template <typename T>
-void myVector<T>::allocate(size_t n) {
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::allocate(size_t n) {
     // allocate 仅适用于空 vector
-    _data = static_cast<T*>(operator new[](n * sizeof(T)));
+    _data = traits::allocate(allocator, n);
     _capacity = n;
 }
 
-template <typename T>
-void myVector<T>::construct_at(size_t index) {
-    new(&_data[index]) T();
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::construct_at(size_t index) {
+    traits::construct(allocator, &_data[index]);
 }
 
-template <typename T>
-void myVector<T>::construct_at(size_t index, const T& value) {
-    new(&_data[index]) T(value);
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::construct_at(size_t index, const T& value) {
+    traits::construct(allocator, &_data[index], value);
 }
 
-template <typename T>
-void myVector<T>::construct_at(size_t index, T&& value) {
-    new(&_data[index]) T(std::move(value));
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::construct_at(size_t index, T&& value) {
+    traits::construct(allocator, &_data[index], std::move(value));
 }
 
-template <typename T>
+template <typename T, typename Alloc>
 template <typename ... Args>
-void myVector<T>::construct_at(size_t index, Args&& ... args) {
-    new(&_data[index]) T(std::forward<Args>(args)...);
+void myVector<T, Alloc>::construct_at(size_t index, Args&& ... args) {
+    traits::construct(allocator, &_data[index], std::forward<Args>(args)...);
 }
 
-template <typename T>
-void myVector<T>::reallocate(size_t newCapacity) {
-    if (newCapacity < _size) {
-        throw std::length_error("newCapacity < _size");
-    }
-
-    T* newData = static_cast<T*>(operator new[](newCapacity * sizeof(T)));
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::reallocate(size_t newCapacity) {
+    // 1. 分配新内存
+    T* newData = traits::allocate(allocator, newCapacity); 
+    
+    // 2. 尝试在新内存上构造元素
     size_t i = 0;
     try {
         for (; i < _size; i ++) {
-            new(&newData[i]) T(std::move_if_noexcept(_data[i]));
+            traits::construct(allocator, &newData[i], std::move_if_noexcept(_data[i]));
         }
     } catch (...) {
+        // 回滚: 销毁已构造的新元素，释放新内存
         for (size_t j = 0; j < i; j ++) {
-            newData[j].~T();
+            traits::destroy(allocator, &newData[j]);
         }
-        operator delete[](static_cast<void*>(newData));
-        throw;
+        traits::deallocate(allocator, newData, newCapacity);
+        throw; // 重新抛出异常，保持 Strong Guarantee
     }
 
+    // 3. 释放旧资源
     for (size_t k = 0; k < _size; k ++) {
-        _data[k].~T();
+        traits::destroy(allocator, &_data[k]);
     }
-    operator delete[](static_cast<void*>(_data));
+    traits::deallocate(allocator, _data, _capacity);
 
+    // 4. 更新指针
     _data = newData;
     _capacity = newCapacity;
 }
 
-template <typename T>
-void myVector<T>::destroy_at(size_t index) {
-    _data[index].~T();
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::swap(myVector& other) noexcept {
+    using std::swap;
+    swap(_data, other._data);
+    swap(_size, other._size);
+    swap(_capacity, other._capacity);
+    swap(allocator, other.allocator);
 }
 
-template <typename T>
-void myVector<T>::destroy_range(size_t from, size_t to) {
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::destroy_at(size_t index) {
+    traits::destroy(allocator, &_data[index]);
+}
+
+template <typename T, typename Alloc>
+void myVector<T, Alloc>::destroy_range(size_t from, size_t to) {
     for (size_t i = from; i < to; i ++) {
-        _data[i].~T();
+        destroy_at(i);
     }
 }
 

@@ -46,7 +46,11 @@ vector 有一个大体框架（如下），`capacity` 管理的是 vector 的总
 └─────────────────┘
 ```
 
-## 主要接口清单
+## 第一阶段：实现最小可行 vector：intVector
+
+详略，在实现 intVector 的过程中先初步了解 vector 的基本功能设计与实现。
+
+## 第二阶段：实现主要接口
 
 ### 1. 构造与析构 (Constructor / Destructor)
 负责对象的创建、拷贝、移动及销毁。
@@ -95,11 +99,11 @@ vector 有一个大体框架（如下），`capacity` 管理的是 vector 的总
 *   `destroy_range(from, to)`: 批量销毁对象。
 *   `reallocate(new_cap)`: 核心扩容逻辑（申请新空间 -> 移动旧数据 -> 释放旧空间）。
 
-## 1. 构造与析构 (Constructor / Destructor)
+### 1. 构造与析构 (Constructor / Destructor)
 
 构造与析构是容器资源管理（RAII）的核心。在实现中，必须严格区分 **内存分配** 与 **对象构造**。
 
-### 1.1 默认构造与析构
+#### 1.1 默认构造与析构
 *   `myVector();`
 *   `~myVector();`
 
@@ -108,7 +112,7 @@ vector 有一个大体框架（如下），`capacity` 管理的是 vector 的总
     1.  调用 `destroy_range(0, _size)`：调用每个现有元素的析构函数。
     2.  调用 `operator delete[](_data)`：释放原始内存块。
 
-### 1.2 拷贝控制 (Deep Copy)
+#### 1.2 拷贝控制 (Deep Copy)
 *   `myVector(const myVector& other);`
 *   `myVector& operator=(const myVector& other);`
 
@@ -119,7 +123,7 @@ vector 有一个大体框架（如下），`capacity` 管理的是 vector 的总
     3.  复制 `_size` 和 `_capacity` 状态。
 *   赋值运算符额外细节：需处理 **自赋值检查** (`this != &other`)，通常采用 `Clear -> Allocate -> Copy` 或 Copy-and-Swap 策略。
 
-### 1.3 移动语义 (Move Semantics)
+#### 1.3 移动语义 (Move Semantics)
 *   `myVector(myVector&& other) noexcept;`
 *   `myVector& operator=(myVector&& other) noexcept;`
 
@@ -132,17 +136,17 @@ vector 有一个大体框架（如下），`capacity` 管理的是 vector 的总
 
 > **关键点**：移动操作被标记为 `noexcept`。这告诉编译器该操作不会抛出异常，使得 `vector` 在扩容（`reallocate`）时可以安全地使用 `std::move_if_noexcept` 迁移元素，而不是回退到昂贵的拷贝构造。
 
-## 2. 容量操作 (Capacity)
+### 2. 容量操作 (Capacity)
 管理容器的大小和内存分配策略。
 
-### 2.1 状态查询
+#### 2.1 状态查询
 *   `size_t size() const noexcept;`
 *   `size_t capacity() const noexcept;`
 *   `bool empty() const noexcept;`
 
 *   实现：直接返回内部成员 `_size` 和 `_capacity`，`empty()` 仅需检查 `_size == 0`。这些操作必须是 `noexcept`。
 
-### 2.2 大小调整 (Resize)
+#### 2.2 大小调整 (Resize)
 *   `void resize(size_t newSize);`
 *   `void resize(size_t newSize, const T& value);`
 
@@ -154,10 +158,10 @@ vector 有一个大体框架（如下），`capacity` 管理的是 vector 的总
     *   填充元素：调用 `construct_at` 在 `[_size, newSize)` 区间内构造对象（默认构造或拷贝指定值）。
 *   更新大小：操作完成后更新 `_size = newSize`。
 
-## 3. 元素访问 (Element Access)
+### 3. 元素访问 (Element Access)
 提供对内部元素的读写访问。这是 vector "连续内存" 特性的直接体现——支持 O(1) 随机访问。
 
-### 3.1 下标访问
+#### 3.1 下标访问
 *   `T& operator[](size_t index);`
 *   `const T& operator[](size_t index) const;`
 *   `T& at(size_t index);`
@@ -168,14 +172,14 @@ vector 有一个大体框架（如下），`capacity` 管理的是 vector 的总
     *   检查 `if (index >= _size)`。
     *   越界则抛出 `std::out_of_range` 异常。
 
-### 3.2 首尾访问
+#### 3.2 首尾访问
 *   `T& front();` / `const T& front() const;`
 *   `T& back();` / `const T& back() const;`
 
 *   实现：分别返回 `_data[0]` 和 `_data[_size - 1]`。
 *   注意：在空容器上调用这些函数是**未定义行为 (Undefined Behavior)**。STL 标准为了性能不强制在此处做 `empty()` 检查（通常在 Debug 模式下断言）。
 
-## 4. 迭代器 (Iterators)
+### 4. 迭代器 (Iterators)
 在当前实现中，`vector` 的迭代器直接使用**原生指针 (`T*`)**，天然支持随机访问（Random Access）。
 
 *   `iterator begin() noexcept;` / `iterator end() noexcept;`
@@ -186,10 +190,10 @@ vector 有一个大体框架（如下），`capacity` 管理的是 vector 的总
     *   `end()` 返回 `_data + _size`（指向最后一个元素的*下一个*位置）。
     *   原生指针支持 `++`, `--`, `+n`, `-n`, `[]` 等操作，完全满足 STL 随机访问迭代器的要求。
 
-## 5. 修改器 (Modifiers)
+### 5. 修改器 (Modifiers)
 修改容器内容，涉及元素的增加、删除和赋值。
 
-### 5.1 插入与追加
+#### 5.1 插入与追加
 *   `void push_back(const T& value);`
 *   `template <typename ... Args> void emplace_back(Args&& ... args);`
 *   `iterator insert(const_iterator pos, const T& value);`
@@ -204,7 +208,7 @@ vector 有一个大体框架（如下），`capacity` 管理的是 vector 的总
     *   Iterator Invalidation: 若触发扩容，所有迭代器失效；否则插入点之后的迭代器失效。
     *   实现细节: 需先移动插入点后的元素，再在空位构造新对象。
 
-### 5.2 删除与清空
+#### 5.2 删除与清空
 *   `void pop_back();`
 *   `iterator erase(const_iterator pos);`
 *   `iterator erase(const_iterator first, const_iterator last);`
@@ -217,11 +221,11 @@ vector 有一个大体框架（如下），`capacity` 管理的是 vector 的总
     *   返回指向被删除元素之后位置的迭代器。
 *   `clear`: 销毁所有元素 (`destroy_range`)，重置 `_size = 0`，但**保留** `capacity`（不释放内存）。
 
-### 5.3 内存预留
+#### 5.3 内存预留
 *   `void reserve(size_t newCapacity);`
 *   若 `newCapacity > _capacity`，则触发 `reallocate`。否则什么都不做。常用于已知数据量时提前分配，减少扩容开销。
 
-## 6. 内部工具 (Internal Tools)
+### 6. 内部工具 (Internal Tools)
 负责底层的内存管理与对象生命周期控制，也是 `myVector` 与普通数组最本质的区别。
 
 | 阶段 | 函数 | 职责 | 状态变化 (Memory/Object) |
@@ -245,3 +249,42 @@ vector 有一个大体框架（如下），`capacity` 管理的是 vector 的总
         3.  迁移成功后，才 `destroy` 旧对象并 `delete` 旧内存。
         4.  更新 `_data` 和 `_capacity`。
     *   若过程中抛出异常（如内存耗尽），旧数据保持不变，函数抛出异常，容器状态回滚。
+
+## 第三阶段：支持自定义分配器
+
+### 7. 内部工具迭代
+
+这是 `myVector` 最核心的部分。标准库容器的精髓在于**将内存分配与对象构造分离**。在这个过程中，我们经历了两个阶段的演进。
+
+### 7.1 原始内存管理
+在引入 Allocator 之前，我们直接使用 C++ 的底层原语来管理内存。这是理解 C++ 内存模型的必经之路。
+
+| 操作 | 代码 | 作用 |
+| :--- | :--- | :--- |
+| **分配** | `::operator new[](bytes)` | 仅向操作系统申请原始内存块，**不调用构造函数**。 |
+| **构造** | `new (ptr) T(args...)` | **Placement New**。在已分配的 `ptr` 地址上直接构造对象。 |
+| **销毁** | `ptr->~T()` | 显式调用析构函数，对象生命周期结束，但内存仍保留。 |
+| **释放** | `::operator delete[](ptr)` | 将原始内存归还给操作系统。 |
+
+**问题**：这种内存管理方式将容器与堆内存强耦合，如果想让 vector 使用共享内存、栈内存或内存池，这种硬编码的方式无法支持。
+
+### 7.2 分配器抽象
+为了让容器更加通用，C++ STL 中引入了 `Allocator` 概念作为可以更加自由设计的内存管理工具。`myVector<T, Alloc>` 将不再直接操作内存，而是委托给 `Alloc` 对象。
+
+**标准接口**方面，我们不直接调用 `Alloc` 的成员函数，而是通过 `std::allocator_traits<Alloc>` 这个代理层进行调用，这允许 Allocator 只要实现最少量的接口即可工作。
+
+| 抽象操作 | 原始实现 | 分配器实现 (`traits = std::allocator_traits<Alloc>`) |
+| :--- | :--- | :--- |
+| **定义** | `myVector<T>` | `myVector<T, Alloc = std::allocator<T>>` |
+| **成员** | 无 | `[[no_unique_address]] Alloc _alloc;(C++20+)` \\ `Alloc _alloc;(other)` |
+| **分配** | `operator new[](n * sizeof(T))` | `traits::allocate(_alloc, n)` |
+| **构造** | `new(p) T(val)` | `traits::construct(_alloc, p, val)` |
+| **销毁** | `p->~T()` | `traits::destroy(_alloc, p)` |
+| **释放** | `operator delete[](p)` | `traits::deallocate(_alloc, p, n)` |
+
+如此，`myVector` 成功将内存管理与逻辑管理进行解耦。具体地，内存来源完全由 `Alloc` 模板参数决定，而 `myVector` 只需要对内存上的对象进行管理。
+
+### 7.3 异常安全
+在 `reallocate` 扩容逻辑中，我们需要保证**强异常安全 (Strong Exception Guarantee)**：只要扩容过程中抛出异常（如内存不足或拷贝构造失败），vector 原有数据必须完好无损。
+
+例如在 `reallocate` 中，我们要依次执行下面的步骤：分配内存、尝试构造（若失败则先回滚后抛异常）、（若构造成功）释放旧资源、更新指针。

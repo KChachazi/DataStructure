@@ -1,6 +1,34 @@
 #include <iostream>
 #include <string>
+#include <memory>
 #include "myVector/myVector.h"
+
+// 测试文件，包含各种测试用例来验证 myVector 的功能和正确性
+
+// 自定义分配器，用于测试 allocator 相关功能
+template <typename T>
+struct DebugAllocator {
+    using value_type = T;
+
+    DebugAllocator() = default;
+    template <typename U> DebugAllocator(const DebugAllocator<U>&) {}
+
+    T* allocate(std::size_t n) {
+        std::cout << "[Alloc] Allocating " << n << " elements (" << n * sizeof(T) << " bytes)\n";
+        return std::allocator<T>{}.allocate(n);
+    }
+
+    void deallocate(T* p, std::size_t n) {
+        std::cout << "[Alloc] Deallocating " << n << " elements\n";
+        std::allocator<T>{}.deallocate(p, n);
+    }
+};
+
+template <typename T, typename U>
+bool operator==(const DebugAllocator<T>&, const DebugAllocator<U>&) { return true; }
+
+template <typename T, typename U>
+bool operator!=(const DebugAllocator<T>&, const DebugAllocator<U>&) { return false; }
 
 // 用于测试生命周期和移动语义的辅助类
 struct Obj {
@@ -165,6 +193,17 @@ int main() {
         std::cout << "v: ";
         for(size_t i=0; i<v.size(); ++i) std::cout << v[i] << " ";
         std::cout << "\n(Expected: 1 4 10 0 0 0)\n";
+
+        print_separator("Test 8: Custom Allocator Check");
+        // 使用自定义分配器声明 Vector
+        myVector<int, DebugAllocator<int>> v_custom;
+        std::cout << "Push 1, 2, 3 (expect alloc messages)\n";
+        v_custom.push_back(1);
+        v_custom.push_back(2);
+        v_custom.push_back(3);
+
+        std::cout << "Vector destruction (expect dealloc messages)\n";
+        // main 结束时，v_custom 会析构，应该打印 deallocate 消息
 
     } catch (const std::exception& e) {
         std::cerr << "Modifiers Exception caught: " << e.what() << "\n";
