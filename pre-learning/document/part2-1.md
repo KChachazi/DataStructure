@@ -244,10 +244,6 @@ Custom delete operator called.
 
 此外需要注意: `malloc` 与 `new` 混用会导致未定义行为，但 `new/delete` 之间可以混用，必须保证 “`operator new` 对应 `operator delete`”。
 
-### Placement new(定位new)
-
-挖坑
-
 ## **RAII思想(资源获取即初始化)**
 
 > **RAII(Resource Acquisition Is Initialization)** 是 C++ 的核心内存管理哲学。
@@ -281,26 +277,29 @@ public:
 ```
 
 创建一个 ``unique_ptr`` 管理 ``Sample`` 对象主要有四种方式：
-1. 使用 `new`
-    这种方法在出现异常时会造成内存泄漏，具体机制为：若在构造 T 时抛异常，则不会进入 `unique_ptr` 构造，而 `raw pointer` 会泄漏。
-    ```cpp
-    std::unique_ptr<Sample> ptr(new Sample());
-    ```
-2. 默认构造函数创建一个空的 `unique_ptr`，使用 `reset` 方法分配新的对象
-    ```cpp
-    std::unique_ptr<Sample> ptr;
-    ptr.reset(new Sample());
-    ```
-3. 直接传入裸指针
-    这种方法可以直接接管已有的指针，但是需要注意不会重复释放。
-    ```cpp
-    Sample *rawptr = new Sample(); std::unique_ptr<Sample> ptr(rawptr);
-    ```
-4. 使用 `std::make_unique` 构造(推荐，C++14及以上)
-    保证异常安全，避免内存泄漏，最推荐的方式。
-    ```cpp
-    std::unique_ptr<Sample> ptr = std::make_unique<Sample>();
-    ```
+
+| 编号 | 方式 | 描述 |
+| :--- | :--- | :--- |
+| 1 | `new` | 这种方法在出现异常时会造成内存泄漏（若构造 T 抛异常，裸指针泄漏） |
+| 2 | `reset` | 默认构造函数创建一个空的 `unique_ptr`，使用 `reset` 方法分配新的对象 |
+| 3 | 裸指针 | 直接接管已有的指针，需注意避免重复释放 |
+| 4 | `std::make_unique` | (推荐，C++14及以上) 保证异常安全，避免内存泄漏 |
+
+```cpp
+/* --- 1. new --- */
+std::unique_ptr<Sample> ptr(new Sample());
+
+/* --- 2. reset --- */
+std::unique_ptr<Sample> ptr;
+ptr.reset(new Sample());
+
+/* --- 3. Raw Pointer --- */
+Sample *rawptr = new Sample(); 
+std::unique_ptr<Sample> ptr(rawptr);
+
+/* --- 4. std::make_unique --- */
+std::unique_ptr<Sample> ptr = std::make_unique<Sample>();
+```
 
 #### 访问对象
 
@@ -311,31 +310,36 @@ public:
 #### 所有权管理
 
 前文提到，`std::unique_ptr`具有对动态分配内存对象的**独占所有权**。这种所有权只能转移或消亡。要对所有权进行操作主要有下面几种方式：
-1. `std::move()`    ：转移指针所有权。
-    ```cpp
-    std::unique_ptr<Sample> ptr1 = make_unique<Sample>();
-    std::unique_ptr<Sample> ptr2 = std::move(ptr1);
-    // 之后 ptr1 变为 nullptr, ptr2 获得所有权
-    ```
-1. `release()`      ：释放`std::unique_ptr`的所有权到原生指针，此时`std::unique_ptr`不会自动释放内存，需要手动释放。
-    ```cpp
-    std::unique_ptr<Sample> ptr = make_unique<Sample>();
-    int *rawptr = ptr.release();
-    // 之后 ptr 变为 nullptr, rawptr 指向 ptr 原本对应的对象
-    // 若要释放该内存必须使用 delete ptr;
-    ```
-1. `reset() / reset(make_unique<T>())`：对于前者，删除当前对象；对于后者，删除当前对象并将指针指向新对象。
-    ```cpp
-    std::unique_ptr<Sample> ptr = make_unique<Sample>();
-    ptr.reset();                // 删除当前对象, ptr 变为 nullptr
-    ptr.reset(new Sample());    // 删除当前对象, ptr 指向新对象
-    ```
-1. `std::swap()`：交换两指针的所有权。
-    ```cpp
-    std::unique_ptr<Sample> ptr1 = make_unique<Sample>();
-    std::unique_ptr<Sample> ptr2 = make_unique<Sample>();
-    std::swap(ptr1, ptr2);
-    ```
+
+| 函数 | 作用 |
+| :--- | :--- |
+| `std::move()` | 转移指针所有权 |
+| `release()` | 释放`std::unique_ptr`的所有权到原生指针，此时`std::unique_ptr`不会自动释放内存，需要手动释放 |
+| `reset()` | 删除当前对象（可选择接管新对象） |
+| `std::swap()` | 交换两指针的所有权 |
+
+```cpp
+/* --- std::move() --- */
+std::unique_ptr<Sample> ptr1 = make_unique<Sample>();
+std::unique_ptr<Sample> ptr2 = std::move(ptr1);
+// 之后 ptr1 变为 nullptr, ptr2 获得所有权
+
+/* --- release() --- */
+std::unique_ptr<Sample> ptr = make_unique<Sample>();
+int *rawptr = ptr.release();
+// 之后 ptr 变为 nullptr, rawptr 指向 ptr 原本对应的对象
+// 若要释放该内存必须使用 delete ptr;
+
+/* --- reset() --- */
+std::unique_ptr<Sample> ptr = make_unique<Sample>();
+ptr.reset();                // 删除当前对象, ptr 变为 nullptr
+ptr.reset(new Sample());    // 删除当前对象, ptr 指向新对象
+
+/* --- std::swap() --- */
+std::unique_ptr<Sample> ptr1 = make_unique<Sample>();
+std::unique_ptr<Sample> ptr2 = make_unique<Sample>();
+std::swap(ptr1, ptr2);
+```
 
 相当一部分库函数需要传入裸指针，因而引入了`get()`成员函数，返回智能指针保存的裸指针。
 
@@ -358,26 +362,29 @@ std::unique_ptr<FILE, decltype(&fclose)> file(fopen("data.txt","r"), fclose);
 和 `std::unique_ptr` 类似，尽管存在构造函数可以用于常见对象，还是更推荐使用异常安全的 `std::make_shared<T>()` 创建此类对象。
 
 创建一个 ``shared_ptr`` 管理 ``Sample`` 对象同样有四种方式：
-1. 使用 `new`
-    这种方法在出现异常时会造成内存泄漏。
-    ```cpp
-    std::shared_ptr<Sample> ptr(new Sample());
-    ```
-2. 默认构造函数创建一个空的 `shared_ptr`，使用 `reset` 方法分配新的对象
-    ```cpp
-    std::shared_ptr<Sample> ptr;
-    ptr.reset(new Sample());
-    ```
-3. 直接传入裸指针
-    这种方法可以直接接管已有的指针，但是需要注意多个 `shared_ptr` 不可从同一个 `raw pointer` 构造，否则造成重复释放。
-    ```cpp
-    Sample *rawptr = new Sample(); std::shared_ptr<Sample> ptr(rawptr);
-    ```
-4. 使用 `std::make_shared` 构造(推荐，C++14及以上)
-    保证异常安全，避免内存泄漏，最推荐的方式。
-    ```cpp
-    std::shared_ptr<Sample> ptr = std::make_shared<Sample>();
-    ```
+
+| 编号 | 方式 | 描述 |
+| :--- | :--- | :--- |
+| 1 | `new` | 这种方法在出现异常时会造成内存泄漏 |
+| 2 | `reset` | 默认构造函数创建一个空的 `shared_ptr`，使用 `reset` 方法分配新的对象 |
+| 3 | 裸指针 | 直接接管已有的指针，注意多个 `shared_ptr` 不可从同一个 `raw pointer` 构造 |
+| 4 | `std::make_shared` | (推荐，C++14及以上) 保证异常安全，避免内存泄漏，最推荐的方式 |
+
+```cpp
+/* --- 1. new --- */
+std::shared_ptr<Sample> ptr(new Sample());
+
+/* --- 2. reset --- */
+std::shared_ptr<Sample> ptr;
+ptr.reset(new Sample());
+
+/* --- 3. Raw Pointer --- */
+Sample *rawptr = new Sample(); 
+std::shared_ptr<Sample> ptr(rawptr);
+
+/* --- 4. std::make_shared --- */
+std::shared_ptr<Sample> ptr = std::make_shared<Sample>();
+```
 
 #### 访问对象
 
@@ -423,42 +430,47 @@ Is ptr1 null after move? Yes
 #### 常用操作
 
 有关`shared_ptr`的使用，主要有以下操作：
-1. `use_count()`：返回当前`shared_ptr`的强引用计数。
-    ```cpp
-    std::shared_ptr<Sample> ptr1 = std::make_shared<Sample>();
-    std::shared_ptr<Sample> ptr2 = ptr1;
-    std::cout << ptr1.use_count(); // 输出2，因为ptr1和ptr2共享所有权
-    ```
-2. `unique()`：检查当前`shared_ptr`是否是唯一拥有该对象的智能指针（即`use_count() == 1`）。
-    ```cpp
-    std::shared_ptr<Sample> ptr1 = std::make_shared<Sample>();
-    if (ptr1.unique()) {
-        // 此时只有ptr1拥有对象
-    }
-    std::shared_ptr<Sample> ptr2 = ptr1;
-    if (!ptr1.unique()) {
-        // 现在有多个shared_ptr拥有该对象
-    }
-    ```
-3. `reset()`：放弃当前`shared_ptr`对对象的所有权，减少引用计数。如果引用计数变为0，则删除对象。
-    ```cpp
-    std::shared_ptr<Sample> ptr1 = std::make_shared<Sample>();
-    std::shared_ptr<Sample> ptr2 = ptr1;
-    ptr1.reset(); // ptr1放弃所有权，引用计数减1，ptr1变为nullptr
-    // 对象仍然存在，因为ptr2还在引用它
-    ```
-4. `get()`：返回内部保存的裸指针，用于与需要裸指针的API交互。
-    ```cpp
-    std::shared_ptr<Sample> ptr = std::make_shared<Sample>();
-    Sample* rawPtr = ptr.get();
-    // 可以使用rawPtr，但不能手动delete它
-    ```
-5. `std::swap()`：交换两个`shared_ptr`所管理的对象。
-    ```cpp
-    std::shared_ptr<Sample> ptr1 = std::make_shared<Sample>();
-    std::shared_ptr<Sample> ptr2 = std::make_shared<Sample>();
-    std::swap(ptr1, ptr2); // 交换ptr1和ptr2管理的对象
-    ```
+
+| 函数 | 作用 |
+| :--- | :--- |
+| `use_count()` | 返回当前`shared_ptr`的强引用计数 |
+| `unique()` | 检查当前`shared_ptr`是否是唯一拥有该对象的智能指针（即`use_count() == 1`） |
+| `reset()` | 放弃当前`shared_ptr`对对象的所有权，减少引用计数。引用计数为0时删除对象 |
+| `get()` | 返回内部保存的裸指针，用于与需要裸指针的API交互 |
+| `std::swap()` | 交换两个`shared_ptr`所管理的对象 |
+
+```cpp
+/* --- use_count() --- */
+std::shared_ptr<Sample> ptr1 = std::make_shared<Sample>();
+std::shared_ptr<Sample> ptr2 = ptr1;
+std::cout << ptr1.use_count(); // 输出2，因为ptr1和ptr2共享所有权
+
+/* --- unique() --- */
+std::shared_ptr<Sample> ptr1 = std::make_shared<Sample>();
+if (ptr1.unique()) {
+    // 此时只有ptr1拥有对象
+}
+std::shared_ptr<Sample> ptr2 = ptr1;
+if (!ptr1.unique()) {
+    // 现在有多个shared_ptr拥有该对象
+}
+
+/* --- reset() --- */
+std::shared_ptr<Sample> ptr1 = std::make_shared<Sample>();
+std::shared_ptr<Sample> ptr2 = ptr1;
+ptr1.reset(); // ptr1放弃所有权，引用计数减1，ptr1变为nullptr
+// 对象仍然存在，因为ptr2还在引用它
+
+/* --- get() --- */
+std::shared_ptr<Sample> ptr = std::make_shared<Sample>();
+Sample* rawPtr = ptr.get();
+// 可以使用rawPtr，但不能手动delete它
+
+/* --- std::swap() --- */
+std::shared_ptr<Sample> ptr1 = std::make_shared<Sample>();
+std::shared_ptr<Sample> ptr2 = std::make_shared<Sample>();
+std::swap(ptr1, ptr2); // 交换ptr1和ptr2管理的对象
+```
 
 #### 循环引用问题
 
@@ -516,21 +528,26 @@ Reference Count of SampleB: 2
 首先需要注意的是，`weak_ptr` **不能直接管理裸指针**，因此其创造对象的方式与先前的`unique_ptr, shared_ptr`均有所不同。
 
 创建方式通常有三种：
-1. 从已有 `shared_ptr` 构造（最常用）
-    ```cpp
-    std::shared_ptr<Sample> sp = std::make_shared<Sample>();
-    std::weak_ptr<Sample> wp(sp);
-    ```
-2. 通过赋值操作生成弱引用
-    ```cpp
-    std::weak_ptr<Sample> wp;
-    wp = sp;
-    ```
-3. 通过 `std::weak_ptr` 拷贝
-    ```cpp
-    std::weak_ptr<Sample> wp1(sp);
-    std::weak_ptr<Sample> wp2(wp1);
-    ```
+
+| 编号 | 方式 | 描述 |
+| :--- | :--- | :--- |
+| 1 | `shared_ptr` 构造 | (最常用) 从已有 `shared_ptr` 构造 |
+| 2 | 赋值操作 | 先声明，后通过赋值生成弱引用 |
+| 3 | `weak_ptr` 拷贝 | 从另一个 `weak_ptr` 拷贝构造 |
+
+```cpp
+/* --- 1. From shared_ptr --- */
+std::shared_ptr<Sample> sp = std::make_shared<Sample>();
+std::weak_ptr<Sample> wp(sp);
+
+/* --- 2. Assignment --- */
+std::weak_ptr<Sample> wp;
+wp = sp;
+
+/* --- 3. Copy --- */
+std::weak_ptr<Sample> wp1(sp);
+std::weak_ptr<Sample> wp2(wp1);
+```
 
 此外注意：weak_ptr **不会改变引用计数**，即不会影响 shared_ptr 共享对象的生命周期。
 
@@ -576,72 +593,77 @@ if (wp.expired()) {
 #### 常用操作
 
 `weak_ptr`的使用，主要有以下操作：
-1. `expired()`：检查`weak_ptr`所观察的对象是否已被释放。
-    ```cpp
-    std::weak_ptr<Sample> weak;
-    {
-        std::shared_ptr<Sample> shared = std::make_shared<Sample>();
-        weak = shared;
-        std::cout << weak.expired(); // 输出0（false），对象还存在
-    }
-    // shared离开作用域，对象被释放
-    std::cout << weak.expired(); // 输出1（true），对象已被释放
-    ```
-2. `lock()`：检查所观察对象是否仍存在。如存在则返回指向该对象的`shared_ptr`，如不存在则返回值为`nullptr`的`shared_ptr`。
-    ```cpp
-    std::weak_ptr<Sample> weak;
-    {
-        std::shared_ptr<Sample> shared = std::make_shared<Sample>();
-        weak = shared;
-        if (auto ptr = weak.lock())
-        {
-            // do something
-        }
-        else std::cout << "Object no longer exists";
-    }
-    ```
-3. `reset()`：释放`weak_ptr`对所观察对象的引用，将其置为空状态。
-    ```cpp
+
+| 函数 | 作用 |
+| :--- | :--- |
+| `expired()` | 检查`weak_ptr`所观察的对象是否已被释放 |
+| `lock()` | 检查所观察对象是否仍存在。如存在则返回指向该对象的`shared_ptr`，否则返回空`shared_ptr` |
+| `reset()` | 释放`weak_ptr`对所观察对象的引用，将其置为空状态 |
+| `use_count()` | 返回当前观察对象的`shared_ptr`的强引用计数 |
+| `std::swap()` | 交换两个`weak_ptr`所观察的对象 |
+| `owner_before()` | 提供基于所有权的排序，用于在关联容器中使用`weak_ptr`作为键 |
+
+```cpp
+/* --- expired() --- */
+std::weak_ptr<Sample> weak;
+{
     std::shared_ptr<Sample> shared = std::make_shared<Sample>();
-    std::weak_ptr<Sample> weak = shared;
-    
-    std::cout << weak.expired(); // 输出0（false）
-    weak.reset();                // 释放观察引用
-    std::cout << weak.expired(); // 输出1（true），weak不再观察任何对象
-    ```
-4. `use_count()`：返回当前观察对象的`shared_ptr`的强引用计数。
-    ```cpp
-    std::shared_ptr<Sample> shared1 = std::make_shared<Sample>();
-    std::weak_ptr<Sample> weak = shared1;
-    std::cout << weak.use_count(); // 输出1
-    
-    std::shared_ptr<Sample> shared2 = shared1;
-    std::cout << weak.use_count(); // 输出2
-    ```
-5. `std::swap()`：交换两个`weak_ptr`所观察的对象。
-    ```cpp
-    std::shared_ptr<Sample> shared1 = std::make_shared<Sample>();
-    std::shared_ptr<Sample> shared2 = std::make_shared<Sample>();
-    
-    std::weak_ptr<Sample> weak1 = shared1;
-    std::weak_ptr<Sample> weak2 = shared2;
-    
-    std::swap(weak1, weak2); // 交换weak1和weak2观察的对象
-    // 现在weak1观察shared2，weak2观察shared1
-    ```
-6. `owner_before()`：提供基于所有权的排序，用于在关联容器中使用`weak_ptr`作为键。
-    ```cpp
-    std::shared_ptr<Sample> shared1 = std::make_shared<Sample>();
-    std::shared_ptr<Sample> shared2 = std::make_shared<Sample>();
-    
-    std::weak_ptr<Sample> weak1 = shared1;
-    std::weak_ptr<Sample> weak2 = shared2;
-    
-    // 基于所有权的比较
-    if (weak1.owner_before(weak2)) {
-        // weak1在所有权顺序上位于weak2之前
+    weak = shared;
+    std::cout << weak.expired(); // 输出0（false），对象还存在
+}
+// shared离开作用域，对象被释放
+std::cout << weak.expired(); // 输出1（true），对象已被释放
+
+/* --- lock() --- */
+std::weak_ptr<Sample> weak;
+{
+    std::shared_ptr<Sample> shared = std::make_shared<Sample>();
+    weak = shared;
+    if (auto ptr = weak.lock())
+    {
+        // do something
     }
-    ```
+    else std::cout << "Object no longer exists";
+}
+
+/* --- reset() --- */
+std::shared_ptr<Sample> shared = std::make_shared<Sample>();
+std::weak_ptr<Sample> weak = shared;
+
+std::cout << weak.expired(); // 输出0（false）
+weak.reset();                // 释放观察引用
+std::cout << weak.expired(); // 输出1（true），weak不再观察任何对象
+
+/* --- use_count() --- */
+std::shared_ptr<Sample> shared1 = std::make_shared<Sample>();
+std::weak_ptr<Sample> weak = shared1;
+std::cout << weak.use_count(); // 输出1
+
+std::shared_ptr<Sample> shared2 = shared1;
+std::cout << weak.use_count(); // 输出2
+
+/* --- std::swap() --- */
+std::shared_ptr<Sample> shared1 = std::make_shared<Sample>();
+std::shared_ptr<Sample> shared2 = std::make_shared<Sample>();
+
+std::weak_ptr<Sample> weak1 = shared1;
+std::weak_ptr<Sample> weak2 = shared2;
+
+std::swap(weak1, weak2); // 交换weak1和weak2观察的对象
+// 现在weak1观察shared2，weak2观察shared1
+
+/* --- owner_before() --- */
+std::shared_ptr<Sample> shared1 = std::make_shared<Sample>();
+std::shared_ptr<Sample> shared2 = std::make_shared<Sample>();
+
+std::weak_ptr<Sample> weak1 = shared1;
+std::weak_ptr<Sample> weak2 = shared2;
+
+// 基于所有权的比较
+if (weak1.owner_before(weak2)) {
+    // weak1在所有权顺序上位于weak2之前
+}
+```
 #### 解决循环引用
 
 有了`weak_ptr`之后，我们就可以调整先前循环引用示例中的`SampleA, SampleB`的构造样例，解决循环引用问题。
