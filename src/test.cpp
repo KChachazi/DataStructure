@@ -1,8 +1,17 @@
 #include <iostream>
 #include "test.h"
 
+// 引入各个模块的测试套件
+#include "test_myVector.hpp"
+#include "test_intList.hpp"
+
 int main() {
-    mydsTest testRunner;
-    testRunner.test9_Performance(30000000, 10); // 300万元素，10次运行取平均
-    return 0;
+    std::cout << "==========================================\n";
+    std::cout << "   Data Structure Library Test Suite\n";
+    std::cout << "==========================================\n";
+    
+    // 运行注册的所有测试
+    int result = TestRegistry::runAllTests();
+    
+    return result;
 }
