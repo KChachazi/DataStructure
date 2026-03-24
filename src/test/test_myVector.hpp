@@ -1,8 +1,8 @@
 #ifndef TEST_MYVECTOR_HPP
 #define TEST_MYVECTOR_HPP
 
-#include "test.h"
-#include "myVector/myVector.h"
+#include "../test.h"
+#include "../myVector/myVector.h"
 #include <vector>
 
 using namespace TestHelpers;

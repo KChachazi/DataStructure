@@ -62,7 +62,6 @@ public:
     
     // 友元测试类声明
     friend class IntListTester; // 允许访问私有成员进行完整性验证
-    friend class ListTester;    // 允许访问私有成员进行完整性验证
 private:
     // Debug
     void debugPrint();

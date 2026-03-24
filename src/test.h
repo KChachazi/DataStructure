@@ -77,6 +77,7 @@ inline bool TestRegistry::currentTestFailed = false;
     void test_case_name##_##test_name(); \
     static int register_##test_case_name##_##test_name = TestRegistry::registerTest(#test_case_name, #test_name, test_case_name##_##test_name); \
     void test_case_name##_##test_name()
+// 此处使用 static int 来注册测试函数，确保在 main() 之前完成注册
 
 #define EXPECT_EQ(val1, val2) \
     if ((val1) != (val2)) { \

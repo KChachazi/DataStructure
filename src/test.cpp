@@ -2,8 +2,9 @@
 #include "test.h"
 
 // 引入各个模块的测试套件
-#include "test_myVector.hpp"
-#include "test_intList.hpp"
+#include "test/test_myVector.hpp"
+#include "test/test_intList.hpp"
+#include "test/test_myList.hpp"
 
 int main() {
     std::cout << "==========================================\n";

@@ -46,14 +46,41 @@ public:
 };
 
 template <typename T>
+bool operator==(const myList_iterator<T>& lhs, const myList_const_iterator<T>& rhs) {
+    return lhs.current == rhs.current;
+}
+
+template <typename T>
+bool operator==(const myList_const_iterator<T>& lhs, const myList_iterator<T>& rhs) {
+    return lhs.current == rhs.current;
+}
+
+template <typename T>
+bool operator!=(const myList_iterator<T>& lhs, const myList_const_iterator<T>& rhs) {
+    return lhs.current != rhs.current;
+}
+
+template <typename T>
+bool operator!=(const myList_const_iterator<T>& lhs, const myList_iterator<T>& rhs) {
+    return lhs.current != rhs.current;
+}
+
+template <typename T>
 class myList {
     ListNode<T> *head;
     size_t _size;
 public:
-    myList();
-    ~myList();
+    friend class ListTester; // 友元测试类，允许访问私有成员
     using iterator = myList_iterator<T>;
     using const_iterator = myList_const_iterator<T>;
+    // 五法则
+    myList();
+    ~myList();
+    myList(const myList& other);
+    myList& operator = (const myList& other);
+    myList(myList&& other) noexcept;
+    myList& operator = (myList&& other) noexcept;
+    void swap(myList& other) noexcept;
     // 数据操作
     void push_front(const T& value);
     void push_back(const T& value);
@@ -61,6 +88,7 @@ public:
     void pop_back();
     void insert(iterator position, const T& value);
     void erase(iterator position);
+    void clear();
     // 查询
     size_t size() const;
     bool empty() const;
@@ -75,7 +103,7 @@ private:
     void debugPrint() const;
 };
 
-// ------------ 构造与析构 ------------
+// ------------ 五法则 ------------
 template <typename T>
 myList<T>::myList() : _size(0) {
     head = new ListNode<T>(); // 哨兵节点
@@ -85,13 +113,49 @@ myList<T>::myList() : _size(0) {
 
 template <typename T>
 myList<T>::~myList() {
-    ListNode<T> *current = head->next;
-    while (current != head) {
-        ListNode<T> *temp = current;
-        current = current->next;
-        delete temp;
-    }
+    myList<T>::clear();
     delete head;
+}
+
+template <typename T>
+void myList<T>::swap(myList& other) noexcept {
+    std::swap(head, other.head);
+    std::swap(_size, other._size);
+}
+
+template <typename T>
+myList<T>::myList(const myList& other) : _size(0) {
+    head = nullptr;
+    myList<T> temp;
+    ListNode<T> *current = other.head->next;
+    while (current != other.head) {
+        temp.push_back(current->data);
+        current = current->next;
+    }
+    swap(temp);
+}
+
+template <typename T>
+myList<T>& myList<T>::operator=(const myList& other) {
+    if (this != &other) {
+        myList<T> temp(other);
+        swap(temp);
+    }
+    return *this;
+}
+
+template <typename T>
+myList<T>::myList(myList&& other) noexcept : head(other.head), _size(other._size) {
+    other.head = nullptr;
+    other._size = 0;
+}
+
+template <typename T>
+myList<T>& myList<T>::operator=(myList&& other) noexcept {
+    if (this != &other) {
+        swap(other);
+    }
+    return *this;
 }
 
 // --------------------- 数据操作 ---------------------
@@ -139,13 +203,32 @@ void myList<T>::erase(iterator position) {
     -- _size;
 }
 
+template <typename T>
+void myList<T>::clear() {
+    if (head == nullptr) return;
+    ListNode<T> *current = head->next;
+    while (current != head) {
+        ListNode<T> *temp = current;
+        current = current->next;
+        delete temp;
+    }
+    head->next = head;
+    head->prev = head;
+    _size = 0;
+}
+
 // --------------------- 查询 ---------------------
 template <typename T>
 size_t myList<T>::size() const {
     return _size;
 }
 
-// debug
+template <typename T>
+bool myList<T>::empty() const {
+    return _size == 0;
+}
+
+// --------------------- Debug ---------------------
 template <typename T>
 void myList<T>::debugPrint() const {
     ListNode<T> *current = head->next;

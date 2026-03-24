@@ -1,37 +1,11 @@
 #ifndef TEST_INTLIST_HPP
 #define TEST_INTLIST_HPP
 
-#include "test.h"
-#include "myList/intList/intList.h"
+#include "../test.h"
+#include "../myList/intList/intList.h"
 
 // 友元测试类 - 验证内部结构完整性 (白盒)
 class IntListTester {
-public:
-    static bool verifyIntegrity(const intList& list) {
-        // 1. 验证双向链表的完整性：prev->next == current && next->prev == current
-        auto* head = list.head; // 访问 private: intList 声明了 friend class ListTester (需要修改命名)
-        // 这里的类名是 IntListTester，intList.h 里声明的是 ListTester
-        // 我们需要在测试代码里适配，或者修改头文件。
-        // 由于不能改头文件里的 friend 声明（假设），我们这里暂时假设名字匹配
-        // 如果名字不匹配，编译会报错访问私有成员。
-        // 根据之前的记录，intList.h 里声明了 friend class ListTester;
-        // 所以我们需要把这个类命名为 ListTester
-        return true; 
-    }
-    
-    // 辅助函数：根据索引获取值（O(N)），用于验证顺序
-    static int get_at(intList& list, size_t index) {
-        size_t i = 0;
-        for (int val : list) {
-            if (i == index) return val;
-            i++;
-        }
-        return -1; // Error
-    }
-};
-
-// 重新声明以匹配 intList.h 中的 friend 声明
-class ListTester {
 public:
     static void verify(const intList& list) {
         auto* head = list.head; // Should be accessible if friend
@@ -54,20 +28,30 @@ public:
         EXPECT_EQ(head->next->prev, head);
         EXPECT_EQ(list.size(), count);
     }
+    
+    // 辅助函数：根据索引获取值（O(N)），用于验证顺序
+    static int get_at(intList& list, size_t index) {
+        size_t i = 0;
+        for (int val : list) {
+            if (i == index) return val;
+            i++;
+        }
+        return -1; // Error
+    }
 };
 
 TEST(IntListTest, BasicPushAndSize) {
     intList list;
     EXPECT_EQ(list.size(), 0);
-    ListTester::verify(list);
+    IntListTester::verify(list);
 
     list.push_back(10);
     EXPECT_EQ(list.size(), 1);
-    ListTester::verify(list);
+    IntListTester::verify(list);
 
     list.push_front(5); // 5, 10
     EXPECT_EQ(list.size(), 2);
-    ListTester::verify(list);
+    IntListTester::verify(list);
 
     auto it = list.begin();
     EXPECT_EQ(*it, 5);
@@ -85,16 +69,16 @@ TEST(IntListTest, PopBackFront) {
     list.pop_front(); // 2 3
     EXPECT_EQ(list.size(), 2);
     EXPECT_EQ(*list.begin(), 2);
-    ListTester::verify(list);
+    IntListTester::verify(list);
 
     list.pop_back(); // 2
     EXPECT_EQ(list.size(), 1);
     EXPECT_EQ(*list.begin(), 2);
-    ListTester::verify(list);
+    IntListTester::verify(list);
     
     list.pop_back(); // empty
     EXPECT_EQ(list.size(), 0);
-    ListTester::verify(list);
+    IntListTester::verify(list);
 }
 
 TEST(IntListTest, InsertErase) {
@@ -108,7 +92,7 @@ TEST(IntListTest, InsertErase) {
     
     list.insert(it, 20); // 10 20 30
     EXPECT_EQ(list.size(), 3);
-    ListTester::verify(list);
+    IntListTester::verify(list);
     
     // Verify sequence
     it = list.begin();
@@ -120,7 +104,7 @@ TEST(IntListTest, InsertErase) {
     it = list.begin(); ++it; // at 20
     list.erase(it); // 10 30
     EXPECT_EQ(list.size(), 2);
-    ListTester::verify(list);
+    IntListTester::verify(list);
     
     it = list.begin();
     EXPECT_EQ(*it, 10); ++it;
